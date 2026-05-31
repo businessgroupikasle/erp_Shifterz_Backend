@@ -1,0 +1,169 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Lead {
+  id         String   @id
+  name       String
+  phone      String
+  email      String
+  source     String
+  service    String
+  vehicle    String
+  assignedTo String
+  status     String
+  notes      String
+  budget     String
+  date       String
+}
+
+model Invoice {
+  id        String   @id
+  type      String
+  client    String
+  phone     String
+  vehicle   String
+  service   String
+  amount    Float
+  gst       Float
+  discount  Float
+  status    String
+  date      String
+  dueDate   String
+  notes     String
+}
+
+model Payment {
+  id        String   @id
+  invoiceId String
+  client    String
+  amount    Float
+  mode      String
+  date      String
+  ref       String
+  notes     String
+}
+
+model Inventory {
+  id       String @id
+  name     String
+  unit     String
+  category String
+  stock    Int
+  reorder  Int
+  cost     Float
+  supplier String
+  location String
+}
+
+model Service {
+  id       String @id
+  name     String
+  category String
+  price    Float
+  duration String
+  warranty String
+  desc     String
+}
+
+model Franchise {
+  id         String @id
+  name       String
+  city       String
+  owner      String
+  phone      String
+  since      String
+  revenue    Float
+  jobs       Int
+  royaltyPct Float
+  status     String
+}
+
+model Customer {
+  id         String @id
+  name       String
+  phone      String
+  email      String
+  vehicle    String
+  model      String
+  visits     Int
+  totalSpend Float
+  lastVisit  String
+}
+
+model CarIn {
+  id           String  @id
+  vehicle      String
+  model        String
+  customer     String
+  phone        String
+  service      String
+  technicianIn String
+  inTime       String
+  outTime      String?
+  status       String
+  odometer     String
+  notes        String
+  jobCardId    String
+}
+
+model Job {
+  id               String  @id
+  vehicle          String
+  customer         String
+  service          String
+  technician       String
+  status           String
+  priority         String
+  startDate        String
+  estCompletion    String
+  actualCompletion String?
+  notes            String
+}
+
+model OutPass {
+  id             String  @id
+  vehicle        String
+  model          String
+  customer       String
+  phone          String
+  service        String
+  outTime        String
+  securityName   String
+  technicianName String
+  remarks        String
+  issued         Boolean
+  carInId        String
+}
+
+model Setting {
+  id          String   @id @default("default")
+  companyName String
+  address     String
+  phone       String
+  email       String
+  gstin       String
+  gstPct      Float
+  currency    String
+  agents      String[]
+}
+
+model Technician {
+  id     String  @id
+  name   String
+  phone  String?
+  email  String?
+  status String  @default("Active")
+}
+
+model User {
+  id       String @id
+  username String @unique
+  password String
+  role     String @default("admin")
+}
+
