@@ -318,6 +318,30 @@ apiRouter.post("/outpass", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.put("/outpass/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    const updatedPass = await db.outPass.update({
+      where: { id },
+      data: {
+        vehicle: data.vehicle,
+        model: data.model,
+        customer: data.customer,
+        phone: data.phone,
+        service: data.service,
+        outTime: data.outTime,
+        securityName: data.securityName,
+        technicianName: data.technicianName,
+        remarks: data.remarks,
+      },
+    });
+    res.json(updatedPass);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // LEADS (CRM)
 // ═══════════════════════════════════════════════════════════════
@@ -381,6 +405,16 @@ apiRouter.put("/leads/:id", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.delete("/leads/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.lead.delete({ where: { id } });
+    res.json({ success: true, message: "Lead deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // INVOICES & BILLING
 // ═══════════════════════════════════════════════════════════════
@@ -435,6 +469,16 @@ apiRouter.put("/invoices/:id", async (req: Request, res: Response) => {
       },
     });
     res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/invoices/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.invoice.delete({ where: { id } });
+    res.json({ success: true, message: "Invoice deleted" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -507,6 +551,16 @@ apiRouter.post("/payments", async (req: Request, res: Response): Promise<void> =
     }
 
     res.json(newPayment);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/payments/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.payment.delete({ where: { id } });
+    res.json({ success: true, message: "Payment deleted" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -745,6 +799,39 @@ apiRouter.get("/customers", async (req: Request, res: Response) => {
   try {
     const list = await db.customer.findMany({ orderBy: { totalSpend: "desc" } });
     res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/customers", async (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    const custId = uid("CUST");
+    const newCust = await db.customer.create({
+      data: {
+        id: custId,
+        name: data.name,
+        phone: data.phone || "",
+        email: data.email || "",
+        vehicle: data.vehicle || "",
+        model: data.model || "",
+        visits: 0,
+        totalSpend: 0,
+        lastVisit: new Date().toISOString().slice(0, 10),
+      },
+    });
+    res.json(newCust);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/customers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.customer.delete({ where: { id } });
+    res.json({ success: true, message: "Customer deleted" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
