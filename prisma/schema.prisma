@@ -35,6 +35,7 @@ model Invoice {
   date      String
   dueDate   String
   notes     String
+  gstNumber String?
 }
 
 model Payment {

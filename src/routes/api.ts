@@ -448,6 +448,7 @@ apiRouter.post("/invoices", async (req: Request, res: Response) => {
         date: data.date || new Date().toISOString().slice(0, 10),
         dueDate: data.dueDate || new Date().toISOString().slice(0, 10),
         notes: data.notes || "",
+        gstNumber: data.gstNumber || null,
       },
     });
     res.json(newInv);
