@@ -796,6 +796,40 @@ apiRouter.post("/franchise", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.put("/franchise/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.body;
+    const updated = await db.franchise.update({
+      where: { id },
+      data: {
+        name: data.name,
+        city: data.city,
+        owner: data.owner,
+        phone: data.phone,
+        since: data.since,
+        revenue: Number(data.revenue || 0),
+        jobs: Number(data.jobs || 0),
+        royaltyPct: Number(data.royaltyPct || 5),
+        status: data.status,
+      },
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/franchise/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.franchise.delete({ where: { id } });
+    res.json({ success: true, message: "Franchise deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // CUSTOMERS
 // ═══════════════════════════════════════════════════════════════
@@ -939,6 +973,115 @@ apiRouter.delete("/technicians/:id", async (req: Request, res: Response) => {
     const id = String(req.params.id);
     await db.technician.delete({ where: { id } });
     res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/reports", async (req: Request, res: Response) => {
+  try {
+    const invoices = await db.invoice.findMany();
+    const payments = await db.payment.findMany();
+    const leads = await db.lead.findMany();
+    const jobs = await db.job.findMany();
+    const inventory = await db.inventory.findMany();
+    const franchises = await db.franchise.findMany();
+
+    // Total Invoiced & Collected
+    const totalInvoiced = invoices.reduce((sum, i) => sum + (i.amount + i.gst - i.discount), 0);
+    const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+
+    // Billing Data (Invoice Aging / Status)
+    const statusMap: Record<string, { amount: number, count: number }> = {};
+    invoices.forEach(i => {
+      if (!statusMap[i.status]) statusMap[i.status] = { amount: 0, count: 0 };
+      statusMap[i.status].amount += (i.amount + i.gst - i.discount);
+      statusMap[i.status].count += 1;
+    });
+    const billingData = Object.entries(statusMap).map(([status, data]) => ({
+      status,
+      amount: data.amount,
+      count: data.count,
+    }));
+
+    // Service Revenue
+    const serviceMap: Record<string, number> = {};
+    let totalServiceRevenue = 0;
+    invoices.forEach(i => {
+      const s = i.service || "General";
+      if (!serviceMap[s]) serviceMap[s] = 0;
+      const val = (i.amount + i.gst - i.discount);
+      serviceMap[s] += val;
+      totalServiceRevenue += val;
+    });
+    const serviceRevenue = Object.entries(serviceMap).map(([service, amount]) => ({
+      service,
+      amount,
+      percentage: totalServiceRevenue > 0 ? Math.round((amount / totalServiceRevenue) * 100) : 0,
+    })).sort((a, b) => b.amount - a.amount);
+
+    // Lead Sources
+    const sourceMap: Record<string, number> = {};
+    leads.forEach(l => {
+      const s = l.source || "Other";
+      sourceMap[s] = (sourceMap[s] || 0) + 1;
+    });
+    const totalLeads = leads.length;
+    const leadSources = Object.entries(sourceMap).map(([source, count]) => ({
+      source,
+      count,
+      percentage: totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0,
+    })).sort((a, b) => b.count - a.count);
+
+    // Lead Conversion
+    const convertedLeads = leads.filter(l => l.status === "Converted" || l.status === "Won" || l.status === "Closed").length;
+    const leadConversion = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+
+    // Job Summary
+    const jobStatusMap: Record<string, number> = {};
+    jobs.forEach(j => {
+      jobStatusMap[j.status] = (jobStatusMap[j.status] || 0) + 1;
+    });
+    const jobSummary = Object.entries(jobStatusMap).map(([status, count]) => {
+      let color = "bg-gray-100 text-gray-700";
+      if (status === "Completed") color = "bg-green-100 text-green-700";
+      if (status === "Pending") color = "bg-yellow-100 text-yellow-700";
+      if (status === "In Progress") color = "bg-blue-100 text-blue-700";
+      if (status === "Cancelled") color = "bg-red-100 text-red-700";
+      return { status, count, color };
+    });
+
+    // Inventory Value
+    const inventoryMap: Record<string, { value: number, items: number }> = {};
+    inventory.forEach(i => {
+      const c = i.category || "General";
+      if (!inventoryMap[c]) inventoryMap[c] = { value: 0, items: 0 };
+      inventoryMap[c].value += (i.stock * i.cost);
+      inventoryMap[c].items += i.stock;
+    });
+    const inventoryValue = Object.entries(inventoryMap).map(([category, data]) => ({
+      category,
+      value: data.value,
+      items: data.items,
+    }));
+
+    // Franchise Revenue
+    const franchiseRevenue = franchises.reduce((sum, f) => sum + f.revenue, 0);
+
+    res.json({
+      billingData,
+      serviceRevenue,
+      leadSources,
+      jobSummary,
+      inventoryValue,
+      totalInvoiced,
+      totalCollected,
+      leadConversion,
+      franchiseRevenue,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
