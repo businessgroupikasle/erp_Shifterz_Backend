@@ -89,25 +89,99 @@ apiRouter.get("/dashboard", async (req, res) => {
             .reduce((sum, i) => sum + (i.amount + i.gst - i.discount), 0);
         const overdueCount = invoices.filter(i => i.status === "Overdue").length;
         const lowStockItems = inventory.filter(itm => itm.stock <= itm.reorder);
-        res.json({
+        const stats = {
             revenue: totalRev,
-            carsInCount: carsInWorkshop.length,
-            activeLeadsCount,
-            pendingOverdueAmount: pendingAndOverdue,
-            overdueCount,
-            lowStockCount: lowStockItems.length,
-            lowStockList: lowStockItems.map(itm => itm.name),
-            carsInList: carsInWorkshop.slice(0, 5),
-            recentLeadsList: leads.slice(0, 5),
-            leadsCount: leads.length,
-            invoicesCount: invoices.length,
-            franchiseList: franchise.map(f => ({
-                city: f.city,
-                revenue: f.revenue,
-                jobs: f.jobs,
-                owner: f.owner,
-            })),
+            revenueGrowth: 12, // Dummy growth for visual
+            carsInWorkshop: carsInWorkshop.length,
+            activeLeads: activeLeadsCount,
+            totalLeads: leads.length,
+            pendingAmount: pendingAndOverdue,
+            overdueCount: overdueCount
+        };
+        const alerts = [];
+        if (lowStockItems.length > 0) {
+            alerts.push(`${lowStockItems.length} inventory items are low on stock.`);
+        }
+        if (overdueCount > 0) {
+            alerts.push(`There are ${overdueCount} overdue invoices needing attention.`);
+        }
+        const carsInFormat = carsInWorkshop.slice(0, 5).map(c => ({
+            vehicleNo: c.vehicle,
+            model: c.model,
+            customer: c.customer,
+            inTime: c.inTime
+        }));
+        const recentLeadsFormat = leads.slice(0, 5).map(l => ({
+            name: l.name,
+            source: l.source,
+            status: l.status,
+            color: l.status === "New" ? "yellow" : l.status === "Won" ? "green" : l.status === "Lost" ? "red" : "blue"
+        }));
+        const sourceCounts = {};
+        leads.forEach(l => { sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1; });
+        const colors = ["blue", "purple", "green", "yellow", "red"];
+        const leadSourcesFormat = Object.entries(sourceCounts).map(([name, value], idx) => ({
+            name,
+            value,
+            percent: leads.length ? Math.round((value / leads.length) * 100) : 0,
+            color: colors[idx % colors.length]
+        }));
+        const invCounts = {};
+        invoices.forEach(i => {
+            const entry = invCounts[i.status] || { count: 0, amt: 0 };
+            entry.count++;
+            entry.amt += (i.amount + i.gst - i.discount);
+            invCounts[i.status] = entry;
         });
+        const invoiceStatusFormat = Object.entries(invCounts).map(([status, data]) => ({
+            status,
+            count: data.count,
+            amount: `₹${data.amt.toLocaleString("en-IN")}`
+        }));
+        const franchiseRevenueFormat = franchise.slice(0, 4).map(f => ({
+            location: f.city,
+            jobs: `${f.jobs} jobs`,
+            revenue: `₹${f.revenue.toLocaleString("en-IN")}`
+        }));
+        res.json({
+            stats,
+            alerts,
+            carsIn: carsInFormat,
+            recentLeads: recentLeadsFormat,
+            leadSources: leadSourcesFormat,
+            invoiceStatus: invoiceStatusFormat,
+            franchiseRevenue: franchiseRevenueFormat
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// ═══════════════════════════════════════════════════════════════
+// VEHICLE LOOKUP
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/vehicle/:vehicleNo", async (req, res) => {
+    try {
+        const vehicleNo = String(req.params.vehicleNo || "").toUpperCase();
+        // Check Customer first
+        const customer = await db.customer.findFirst({ where: { vehicle: vehicleNo } });
+        if (customer) {
+            res.json({ name: customer.name, phone: customer.phone, model: customer.model });
+            return;
+        }
+        // Check CarIn
+        const carIn = await db.carIn.findFirst({ where: { vehicle: vehicleNo }, orderBy: { inTime: "desc" } });
+        if (carIn) {
+            res.json({ name: carIn.customer, phone: carIn.phone, model: carIn.model });
+            return;
+        }
+        // Check Lead
+        const lead = await db.lead.findFirst({ where: { vehicle: vehicleNo }, orderBy: { date: "desc" } });
+        if (lead) {
+            res.json({ name: lead.name, phone: lead.phone, model: "" });
+            return;
+        }
+        res.status(404).json({ error: "Vehicle not found" });
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -197,10 +271,46 @@ apiRouter.post("/carin", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Edit a car entry
+apiRouter.put("/carin/:id", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const data = req.body;
+        const updated = await db.carIn.update({
+            where: { id },
+            data: {
+                vehicle: data.vehicle,
+                model: data.model,
+                customer: data.customer,
+                phone: data.phone,
+                service: data.service,
+                technicianIn: data.technicianIn,
+                odometer: String(data.odometer || "0"),
+                notes: data.notes,
+            },
+        });
+        if (updated.jobCardId) {
+            await db.job.update({
+                where: { id: updated.jobCardId },
+                data: {
+                    vehicle: data.vehicle,
+                    customer: data.customer,
+                    service: data.service,
+                    technician: data.technicianIn,
+                },
+            });
+        }
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // Check-out a car and generate out pass
 apiRouter.put("/carin/:id/checkout", async (req, res) => {
     try {
         const id = String(req.params.id);
+        const { securityName } = req.body;
         const now = new Date().toISOString();
         const car = await db.carIn.findUnique({ where: { id } });
         if (!car) {
@@ -238,7 +348,7 @@ apiRouter.put("/carin/:id/checkout", async (req, res) => {
                     phone: car.phone,
                     service: car.service,
                     outTime: now,
-                    securityName: "Murugan", // Default security staff
+                    securityName: securityName || "N/A",
                     technicianName: car.technicianIn,
                     remarks: "Washed and checked out successfully.",
                     issued: true,
@@ -344,6 +454,24 @@ apiRouter.post("/leads", async (req, res) => {
                 date: data.date || new Date().toISOString().slice(0, 10),
             },
         });
+        if (newLead.status === "Converted" && newLead.phone) {
+            const existingCust = await db.customer.findFirst({ where: { phone: newLead.phone } });
+            if (!existingCust) {
+                await db.customer.create({
+                    data: {
+                        id: uid("CUST"),
+                        name: newLead.name,
+                        phone: newLead.phone,
+                        email: newLead.email,
+                        vehicle: newLead.vehicle,
+                        model: "",
+                        visits: 0,
+                        totalSpend: 0,
+                        lastVisit: new Date().toISOString().slice(0, 10)
+                    }
+                });
+            }
+        }
         res.json(newLead);
     }
     catch (error) {
@@ -370,6 +498,31 @@ apiRouter.put("/leads/:id", async (req, res) => {
                 date: data.date,
             },
         });
+        if (updated.status === "Converted" && updated.phone) {
+            const existingCust = await db.customer.findFirst({ where: { phone: updated.phone } });
+            if (!existingCust) {
+                await db.customer.create({
+                    data: {
+                        id: uid("CUST"),
+                        name: updated.name,
+                        phone: updated.phone,
+                        email: updated.email,
+                        vehicle: updated.vehicle,
+                        model: "",
+                        visits: 0,
+                        totalSpend: 0,
+                        lastVisit: new Date().toISOString().slice(0, 10)
+                    }
+                });
+            }
+        }
+        else if (updated.phone) {
+            // If status is changed from Converted to something else, remove customer if they have 0 visits
+            const existingCust = await db.customer.findFirst({ where: { phone: updated.phone } });
+            if (existingCust && existingCust.visits === 0) {
+                await db.customer.delete({ where: { id: existingCust.id } });
+            }
+        }
         res.json(updated);
     }
     catch (error) {
@@ -876,6 +1029,7 @@ apiRouter.get("/settings", async (req, res) => {
                     gstPct: 18,
                     currency: "₹",
                     agents: ["Arjun", "Sathish", "Mani"],
+                    categories: ["PPF", "Ceramic Coating", "Detailing", "General"],
                 },
             });
         }
@@ -890,7 +1044,8 @@ apiRouter.get("/settings", async (req, res) => {
                 gstPercent: settings.gstPct.toString()
             },
             technicians: techs.map((t) => t.name),
-            salesAgents: settings.agents
+            salesAgents: settings.agents,
+            categories: settings.categories
         });
     }
     catch (error) {
@@ -899,7 +1054,7 @@ apiRouter.get("/settings", async (req, res) => {
 });
 apiRouter.put("/settings", async (req, res) => {
     try {
-        const { companyInfo, technicians, salesAgents } = req.body;
+        const { companyInfo, technicians, salesAgents, categories } = req.body;
         const settings = await db.setting.upsert({
             where: { id: "default" },
             update: {
@@ -911,6 +1066,7 @@ apiRouter.put("/settings", async (req, res) => {
                 gstPct: Number(companyInfo?.gstPercent || 18),
                 currency: "₹",
                 agents: salesAgents || [],
+                categories: categories || [],
             },
             create: {
                 id: "default",
@@ -922,6 +1078,7 @@ apiRouter.put("/settings", async (req, res) => {
                 gstPct: Number(companyInfo?.gstPercent || 18),
                 currency: "₹",
                 agents: salesAgents || [],
+                categories: categories || [],
             },
         });
         if (Array.isArray(technicians)) {
