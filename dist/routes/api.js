@@ -89,24 +89,68 @@ apiRouter.get("/dashboard", async (req, res) => {
             .reduce((sum, i) => sum + (i.amount + i.gst - i.discount), 0);
         const overdueCount = invoices.filter(i => i.status === "Overdue").length;
         const lowStockItems = inventory.filter(itm => itm.stock <= itm.reorder);
-        res.json({
+        const stats = {
             revenue: totalRev,
-            carsInCount: carsInWorkshop.length,
-            activeLeadsCount,
-            pendingOverdueAmount: pendingAndOverdue,
-            overdueCount,
-            lowStockCount: lowStockItems.length,
-            lowStockList: lowStockItems.map(itm => itm.name),
-            carsInList: carsInWorkshop.slice(0, 5),
-            recentLeadsList: leads.slice(0, 5),
-            leadsCount: leads.length,
-            invoicesCount: invoices.length,
-            franchiseList: franchise.map(f => ({
-                city: f.city,
-                revenue: f.revenue,
-                jobs: f.jobs,
-                owner: f.owner,
-            })),
+            revenueGrowth: 12, // Dummy growth for visual
+            carsInWorkshop: carsInWorkshop.length,
+            activeLeads: activeLeadsCount,
+            totalLeads: leads.length,
+            pendingAmount: pendingAndOverdue,
+            overdueCount: overdueCount
+        };
+        const alerts = [];
+        if (lowStockItems.length > 0) {
+            alerts.push(`${lowStockItems.length} inventory items are low on stock.`);
+        }
+        if (overdueCount > 0) {
+            alerts.push(`There are ${overdueCount} overdue invoices needing attention.`);
+        }
+        const carsInFormat = carsInWorkshop.slice(0, 5).map(c => ({
+            vehicleNo: c.vehicle,
+            model: c.model,
+            customer: c.customer,
+            inTime: c.inTime
+        }));
+        const recentLeadsFormat = leads.slice(0, 5).map(l => ({
+            name: l.name,
+            source: l.source,
+            status: l.status,
+            color: l.status === "New" ? "yellow" : l.status === "Won" ? "green" : l.status === "Lost" ? "red" : "blue"
+        }));
+        const sourceCounts = {};
+        leads.forEach(l => { sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1; });
+        const colors = ["blue", "purple", "green", "yellow", "red"];
+        const leadSourcesFormat = Object.entries(sourceCounts).map(([name, value], idx) => ({
+            name,
+            value,
+            percent: leads.length ? Math.round((value / leads.length) * 100) : 0,
+            color: colors[idx % colors.length]
+        }));
+        const invCounts = {};
+        invoices.forEach(i => {
+            const entry = invCounts[i.status] || { count: 0, amt: 0 };
+            entry.count++;
+            entry.amt += (i.amount + i.gst - i.discount);
+            invCounts[i.status] = entry;
+        });
+        const invoiceStatusFormat = Object.entries(invCounts).map(([status, data]) => ({
+            status,
+            count: data.count,
+            amount: `₹${data.amt.toLocaleString("en-IN")}`
+        }));
+        const franchiseRevenueFormat = franchise.slice(0, 4).map(f => ({
+            location: f.city,
+            jobs: `${f.jobs} jobs`,
+            revenue: `₹${f.revenue.toLocaleString("en-IN")}`
+        }));
+        res.json({
+            stats,
+            alerts,
+            carsIn: carsInFormat,
+            recentLeads: recentLeadsFormat,
+            leadSources: leadSourcesFormat,
+            invoiceStatus: invoiceStatusFormat,
+            franchiseRevenue: franchiseRevenueFormat
         });
     }
     catch (error) {
