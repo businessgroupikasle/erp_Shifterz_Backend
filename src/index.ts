@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { apiRouter } from "./routes/api.js";
+import { autoSeed } from "./lib/autoSeed.js";
 
 // Load environment variables
 dotenv.config();
@@ -22,6 +23,7 @@ app.get("/health", (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Shifterz backend running on port ${PORT}`);
+  await autoSeed();
 });
