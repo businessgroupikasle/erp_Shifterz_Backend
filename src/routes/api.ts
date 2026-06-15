@@ -326,7 +326,7 @@ apiRouter.put("/outpass/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const data = req.body;
     const updatedPass = await db.outPass.update({
-      where: { id },
+      where: { id: id as string },
       data: {
         vehicle: data.vehicle,
         model: data.model,
@@ -452,6 +452,11 @@ apiRouter.post("/invoices", async (req: Request, res: Response) => {
         dueDate: data.dueDate || new Date().toISOString().slice(0, 10),
         notes: data.notes || "",
         gstNumber: data.gstNumber || null,
+        items: data.items ? data.items : null,
+        bankDetails: data.bankDetails || null,
+        paymentTerms: data.paymentTerms || null,
+        deliveryTerms: data.deliveryTerms || null,
+        authorizedSignatory: data.authorizedSignatory || null,
       },
     });
     res.json(newInv);
@@ -470,6 +475,11 @@ apiRouter.put("/invoices/:id", async (req: Request, res: Response) => {
         status: data.status,
         notes: data.notes,
         dueDate: data.dueDate,
+        items: data.items !== undefined ? data.items : undefined,
+        bankDetails: data.bankDetails !== undefined ? data.bankDetails : undefined,
+        paymentTerms: data.paymentTerms !== undefined ? data.paymentTerms : undefined,
+        deliveryTerms: data.deliveryTerms !== undefined ? data.deliveryTerms : undefined,
+        authorizedSignatory: data.authorizedSignatory !== undefined ? data.authorizedSignatory : undefined,
       },
     });
     res.json(updated);
@@ -760,6 +770,16 @@ apiRouter.put("/jobs/:id", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.delete("/jobs/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.job.delete({ where: { id } });
+    res.json({ success: true, message: "Job deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // FRANCHISE
 // ═══════════════════════════════════════════════════════════════
@@ -997,9 +1017,10 @@ apiRouter.get("/reports", async (req: Request, res: Response) => {
     // Billing Data (Invoice Aging / Status)
     const statusMap: Record<string, { amount: number, count: number }> = {};
     invoices.forEach(i => {
-      if (!statusMap[i.status]) statusMap[i.status] = { amount: 0, count: 0 };
-      statusMap[i.status].amount += (i.amount + i.gst - i.discount);
-      statusMap[i.status].count += 1;
+      const entry = statusMap[i.status] || { amount: 0, count: 0 };
+      entry.amount += (i.amount + i.gst - i.discount);
+      entry.count += 1;
+      statusMap[i.status] = entry;
     });
     const billingData = Object.entries(statusMap).map(([status, data]) => ({
       status,
