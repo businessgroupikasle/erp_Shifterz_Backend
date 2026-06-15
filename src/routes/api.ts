@@ -918,40 +918,70 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
         },
       });
     }
-    res.json(settings);
+    const techs = await db.technician.findMany();
+
+    res.json({
+      companyInfo: {
+        name: settings.companyName,
+        address: settings.address,
+        phone: settings.phone,
+        email: settings.email,
+        gstin: settings.gstin,
+        gstPercent: settings.gstPct.toString()
+      },
+      technicians: techs.map((t: any) => t.name),
+      salesAgents: settings.agents
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-apiRouter.post("/settings", async (req: Request, res: Response) => {
+apiRouter.put("/settings", async (req: Request, res: Response) => {
   try {
-    const data = req.body;
+    const { companyInfo, technicians, salesAgents } = req.body;
+    
     const settings = await db.setting.upsert({
       where: { id: "default" },
       update: {
-        companyName: data.companyName,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
-        gstin: data.gstin,
-        gstPct: Number(data.gstPct || 18),
-        currency: data.currency || "₹",
-        agents: data.agents || [],
+        companyName: companyInfo?.name || "Shifterz",
+        address: companyInfo?.address || "",
+        phone: companyInfo?.phone || "",
+        email: companyInfo?.email || "",
+        gstin: companyInfo?.gstin || "",
+        gstPct: Number(companyInfo?.gstPercent || 18),
+        currency: "₹",
+        agents: salesAgents || [],
       },
       create: {
         id: "default",
-        companyName: data.companyName,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
-        gstin: data.gstin,
-        gstPct: Number(data.gstPct || 18),
-        currency: data.currency || "₹",
-        agents: data.agents || [],
+        companyName: companyInfo?.name || "Shifterz",
+        address: companyInfo?.address || "",
+        phone: companyInfo?.phone || "",
+        email: companyInfo?.email || "",
+        gstin: companyInfo?.gstin || "",
+        gstPct: Number(companyInfo?.gstPercent || 18),
+        currency: "₹",
+        agents: salesAgents || [],
       },
     });
-    res.json(settings);
+
+    if (Array.isArray(technicians)) {
+      await db.technician.deleteMany();
+      for (const t of technicians) {
+        await db.technician.create({
+          data: {
+            id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
+            name: t,
+            phone: "",
+            email: "",
+            status: "Active"
+          }
+        });
+      }
+    }
+
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
