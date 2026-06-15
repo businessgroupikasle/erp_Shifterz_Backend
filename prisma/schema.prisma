@@ -34,9 +34,14 @@ model Invoice {
   discount  Float
   status    String
   date      String
-  dueDate   String
-  notes     String
-  gstNumber String?
+  dueDate             String
+  notes               String
+  gstNumber           String?
+  items               Json?
+  bankDetails         String?
+  paymentTerms        String?
+  deliveryTerms       String?
+  authorizedSignatory String?
 }
 
 model Payment {
