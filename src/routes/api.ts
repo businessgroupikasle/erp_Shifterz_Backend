@@ -189,6 +189,40 @@ apiRouter.get("/dashboard", async (req: Request, res: Response): Promise<void> =
 });
 
 // ═══════════════════════════════════════════════════════════════
+// VEHICLE LOOKUP
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/vehicle/:vehicleNo", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const vehicleNo = String(req.params.vehicleNo || "").toUpperCase();
+
+    // Check Customer first
+    const customer = await db.customer.findFirst({ where: { vehicle: vehicleNo } });
+    if (customer) {
+      res.json({ name: customer.name, phone: customer.phone, model: customer.model });
+      return;
+    }
+
+    // Check CarIn
+    const carIn = await db.carIn.findFirst({ where: { vehicle: vehicleNo }, orderBy: { inTime: "desc" } });
+    if (carIn) {
+      res.json({ name: carIn.customer, phone: carIn.phone, model: carIn.model });
+      return;
+    }
+
+    // Check Lead
+    const lead = await db.lead.findFirst({ where: { vehicle: vehicleNo }, orderBy: { date: "desc" } });
+    if (lead) {
+      res.json({ name: lead.name, phone: lead.phone, model: "" });
+      return;
+    }
+
+    res.status(404).json({ error: "Vehicle not found" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // CAR IN / OUT
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/carin", async (req: Request, res: Response) => {
@@ -275,10 +309,48 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
   }
 });
 
+// Edit a car entry
+apiRouter.put("/carin/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.body;
+    const updated = await db.carIn.update({
+      where: { id },
+      data: {
+        vehicle: data.vehicle,
+        model: data.model,
+        customer: data.customer,
+        phone: data.phone,
+        service: data.service,
+        technicianIn: data.technicianIn,
+        odometer: String(data.odometer || "0"),
+        notes: data.notes,
+      },
+    });
+
+    if (updated.jobCardId) {
+      await db.job.update({
+        where: { id: updated.jobCardId },
+        data: {
+          vehicle: data.vehicle,
+          customer: data.customer,
+          service: data.service,
+          technician: data.technicianIn,
+        },
+      });
+    }
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Check-out a car and generate out pass
 apiRouter.put("/carin/:id/checkout", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
+    const { securityName } = req.body;
     const now = new Date().toISOString();
 
     const car = await db.carIn.findUnique({ where: { id } });
@@ -320,7 +392,7 @@ apiRouter.put("/carin/:id/checkout", async (req: Request, res: Response) => {
           phone: car.phone,
           service: car.service,
           outTime: now,
-          securityName: "Murugan", // Default security staff
+          securityName: securityName || "N/A",
           technicianName: car.technicianIn,
           remarks: "Washed and checked out successfully.",
           issued: true,
@@ -427,6 +499,26 @@ apiRouter.post("/leads", async (req: Request, res: Response) => {
         date: data.date || new Date().toISOString().slice(0, 10),
       },
     });
+
+    if (newLead.status === "Converted" && newLead.phone) {
+      const existingCust = await db.customer.findFirst({ where: { phone: newLead.phone } });
+      if (!existingCust) {
+        await db.customer.create({
+          data: {
+            id: uid("CUST"),
+            name: newLead.name,
+            phone: newLead.phone,
+            email: newLead.email,
+            vehicle: newLead.vehicle,
+            model: "",
+            visits: 0,
+            totalSpend: 0,
+            lastVisit: new Date().toISOString().slice(0, 10)
+          }
+        });
+      }
+    }
+
     res.json(newLead);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -453,6 +545,32 @@ apiRouter.put("/leads/:id", async (req: Request, res: Response) => {
         date: data.date,
       },
     });
+
+    if (updated.status === "Converted" && updated.phone) {
+      const existingCust = await db.customer.findFirst({ where: { phone: updated.phone } });
+      if (!existingCust) {
+        await db.customer.create({
+          data: {
+            id: uid("CUST"),
+            name: updated.name,
+            phone: updated.phone,
+            email: updated.email,
+            vehicle: updated.vehicle,
+            model: "",
+            visits: 0,
+            totalSpend: 0,
+            lastVisit: new Date().toISOString().slice(0, 10)
+          }
+        });
+      }
+    } else if (updated.phone) {
+      // If status is changed from Converted to something else, remove customer if they have 0 visits
+      const existingCust = await db.customer.findFirst({ where: { phone: updated.phone } });
+      if (existingCust && existingCust.visits === 0) {
+        await db.customer.delete({ where: { id: existingCust.id } });
+      }
+    }
+
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -966,6 +1084,7 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
           gstPct: 18,
           currency: "₹",
           agents: ["Arjun", "Sathish", "Mani"],
+          categories: ["PPF", "Ceramic Coating", "Detailing", "General"],
         },
       });
     }
@@ -981,7 +1100,8 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
         gstPercent: settings.gstPct.toString()
       },
       technicians: techs.map((t: any) => t.name),
-      salesAgents: settings.agents
+      salesAgents: settings.agents,
+      categories: settings.categories
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -990,7 +1110,7 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
 
 apiRouter.put("/settings", async (req: Request, res: Response) => {
   try {
-    const { companyInfo, technicians, salesAgents } = req.body;
+    const { companyInfo, technicians, salesAgents, categories } = req.body;
     
     const settings = await db.setting.upsert({
       where: { id: "default" },
@@ -1003,6 +1123,7 @@ apiRouter.put("/settings", async (req: Request, res: Response) => {
         gstPct: Number(companyInfo?.gstPercent || 18),
         currency: "₹",
         agents: salesAgents || [],
+        categories: categories || [],
       },
       create: {
         id: "default",
@@ -1014,6 +1135,7 @@ apiRouter.put("/settings", async (req: Request, res: Response) => {
         gstPct: Number(companyInfo?.gstPercent || 18),
         currency: "₹",
         agents: salesAgents || [],
+        categories: categories || [],
       },
     });
 

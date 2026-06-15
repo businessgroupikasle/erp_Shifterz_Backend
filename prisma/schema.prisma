@@ -157,6 +157,7 @@ model Setting {
   gstPct      Float
   currency    String
   agents      String[]
+  categories  String[]
 }
 
 model Technician {
