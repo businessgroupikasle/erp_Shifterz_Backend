@@ -206,7 +206,7 @@ apiRouter.get("/vehicle/:vehicleNo", async (req, res) => {
         // Check Customer first
         const customer = await db.customer.findFirst({ where: { vehicle: vehicleNo } });
         if (customer) {
-            res.json({ name: customer.name, phone: customer.phone, model: customer.model });
+            res.json({ name: customer.name, phone: customer.phone, email: customer.email, model: customer.model });
             return;
         }
         // Check CarIn
@@ -218,7 +218,7 @@ apiRouter.get("/vehicle/:vehicleNo", async (req, res) => {
         // Check Lead
         const lead = await db.lead.findFirst({ where: { vehicle: vehicleNo }, orderBy: { date: "desc" } });
         if (lead) {
-            res.json({ name: lead.name, phone: lead.phone, model: "" });
+            res.json({ name: lead.name, phone: lead.phone, email: lead.email, model: "" });
             return;
         }
         res.status(404).json({ error: "Vehicle not found" });
@@ -585,7 +585,13 @@ apiRouter.delete("/leads/:id", async (req, res) => {
 apiRouter.get("/invoices", async (req, res) => {
     try {
         const list = await db.invoice.findMany({ orderBy: { date: "desc" } });
-        res.json(list);
+        const payments = await db.payment.findMany();
+        const listWithPaidAmount = list.map(inv => {
+            const invPayments = payments.filter(p => p.invoiceId === inv.id);
+            const paidAmount = invPayments.reduce((sum, p) => sum + p.amount, 0);
+            return { ...inv, paidAmount };
+        });
+        res.json(listWithPaidAmount);
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -651,7 +657,10 @@ apiRouter.put("/invoices/:id", async (req, res) => {
 apiRouter.delete("/invoices/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.invoice.delete({ where: { id } });
+        // Delete related payments first (cascade delete)
+        await db.payment.deleteMany({ where: { invoiceId: id } });
+        // Then delete the invoice
+        await db.invoice.deleteMany({ where: { id } });
         res.json({ success: true, message: "Invoice deleted" });
     }
     catch (error) {
