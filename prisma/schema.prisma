@@ -158,6 +158,7 @@ model Setting {
   currency    String
   agents      String[]
   categories  String[]
+  securityGuards String[]
 }
 
 model Technician {

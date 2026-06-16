@@ -3,7 +3,47 @@ import { db } from "../lib/db.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 export const apiRouter = Router();
-// Helper to generate unique IDs
+// Counters for sequential ID generation
+const idCounters = {
+    CUS: 0,
+    INV: 0,
+    QT: 0,
+    EST: 0,
+    L: 0,
+    JOB: 0,
+};
+// Helper to generate sequential IDs
+const generateSequentialId = async (prefix) => {
+    if (idCounters[prefix] === 0) {
+        let maxId = 0;
+        let model = null;
+        if (prefix === "CUS")
+            model = db.customer;
+        else if (prefix === "INV" || prefix === "QT" || prefix === "EST")
+            model = db.invoice;
+        else if (prefix === "L")
+            model = db.lead;
+        else if (prefix === "JOB")
+            model = db.job;
+        if (model) {
+            const allRecords = await model.findMany({
+                where: { id: { startsWith: prefix } },
+                select: { id: true }
+            });
+            for (const record of allRecords) {
+                const numStr = record.id.replace(prefix, "");
+                const num = parseInt(numStr, 10);
+                if (!isNaN(num) && num > maxId) {
+                    maxId = num;
+                }
+            }
+        }
+        idCounters[prefix] = maxId;
+    }
+    idCounters[prefix] = (idCounters[prefix] || 0) + 1;
+    return `${prefix}${String(idCounters[prefix]).padStart(3, "0")}`;
+};
+// Helper to generate unique IDs (legacy - kept for reference)
 const uid = (prefix) => `${prefix}${Date.now().toString(36).toUpperCase()}`;
 // ═══════════════════════════════════════════════════════════════
 // AUTHENTICATION
@@ -203,7 +243,7 @@ apiRouter.post("/carin", async (req, res) => {
     try {
         const data = req.body;
         const carId = uid("CAR");
-        const jobCardId = uid("JOB");
+        const jobCardId = await generateSequentialId("JOB");
         const newCar = await db.carIn.create({
             data: {
                 id: carId,
@@ -253,7 +293,7 @@ apiRouter.post("/carin", async (req, res) => {
         else {
             await db.customer.create({
                 data: {
-                    id: uid("CUS"),
+                    id: await generateSequentialId("CUS"),
                     name: data.customer || "Walk-in",
                     phone: data.phone || "",
                     email: "",
@@ -440,7 +480,7 @@ apiRouter.post("/leads", async (req, res) => {
         const data = req.body;
         const newLead = await db.lead.create({
             data: {
-                id: uid("L"),
+                id: await generateSequentialId("L"),
                 name: data.name,
                 phone: data.phone || "",
                 email: data.email || "",
@@ -459,7 +499,7 @@ apiRouter.post("/leads", async (req, res) => {
             if (!existingCust) {
                 await db.customer.create({
                     data: {
-                        id: uid("CUST"),
+                        id: await generateSequentialId("CUS"),
                         name: newLead.name,
                         phone: newLead.phone,
                         email: newLead.email,
@@ -503,7 +543,7 @@ apiRouter.put("/leads/:id", async (req, res) => {
             if (!existingCust) {
                 await db.customer.create({
                     data: {
-                        id: uid("CUST"),
+                        id: await generateSequentialId("CUS"),
                         name: updated.name,
                         phone: updated.phone,
                         email: updated.email,
@@ -554,8 +594,8 @@ apiRouter.get("/invoices", async (req, res) => {
 apiRouter.post("/invoices", async (req, res) => {
     try {
         const data = req.body;
-        const pre = data.type === "Invoice" ? "INV" : data.type === "Quotation" ? "QT" : data.type === "Proforma" ? "PRF" : "EST";
-        const invId = `${pre}-${Date.now().toString().slice(-4)}`;
+        const pre = data.type === "Invoice" ? "INV" : data.type === "Quotation" ? "QT" : "EST";
+        const invId = await generateSequentialId(pre);
         const newInv = await db.invoice.create({
             data: {
                 id: invId,
@@ -841,7 +881,7 @@ apiRouter.get("/jobs", async (req, res) => {
 apiRouter.post("/jobs", async (req, res) => {
     try {
         const data = req.body;
-        const jobId = uid("JOB");
+        const jobId = await generateSequentialId("JOB");
         const newJob = await db.job.create({
             data: {
                 id: jobId,
@@ -1030,6 +1070,7 @@ apiRouter.get("/settings", async (req, res) => {
                     currency: "₹",
                     agents: ["Arjun", "Sathish", "Mani"],
                     categories: ["PPF", "Ceramic Coating", "Detailing", "General"],
+                    securityGuards: [],
                 },
             });
         }
@@ -1045,7 +1086,8 @@ apiRouter.get("/settings", async (req, res) => {
             },
             technicians: techs.map((t) => t.name),
             salesAgents: settings.agents,
-            categories: settings.categories
+            categories: settings.categories,
+            securityGuards: settings.securityGuards
         });
     }
     catch (error) {
@@ -1054,7 +1096,7 @@ apiRouter.get("/settings", async (req, res) => {
 });
 apiRouter.put("/settings", async (req, res) => {
     try {
-        const { companyInfo, technicians, salesAgents, categories } = req.body;
+        const { companyInfo, technicians, salesAgents, categories, securityGuards } = req.body;
         const settings = await db.setting.upsert({
             where: { id: "default" },
             update: {
@@ -1067,6 +1109,7 @@ apiRouter.put("/settings", async (req, res) => {
                 currency: "₹",
                 agents: salesAgents || [],
                 categories: categories || [],
+                securityGuards: securityGuards || [],
             },
             create: {
                 id: "default",
@@ -1079,6 +1122,7 @@ apiRouter.put("/settings", async (req, res) => {
                 currency: "₹",
                 agents: salesAgents || [],
                 categories: categories || [],
+                securityGuards: securityGuards || [],
             },
         });
         if (Array.isArray(technicians)) {
