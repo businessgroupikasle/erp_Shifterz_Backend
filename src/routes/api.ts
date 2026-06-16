@@ -1003,6 +1003,18 @@ apiRouter.delete("/jobs/:id", async (req: Request, res: Response) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// SERVICES
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/services", async (req: Request, res: Response) => {
+  try {
+    const list = await db.service.findMany();
+    res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // FRANCHISE
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/franchise", async (req: Request, res: Response) => {
