@@ -46,12 +46,13 @@ async function main() {
   });
 
   // Technicians
+  const techPassword = await bcrypt.hash("tech123", 10);
   await prisma.technician.createMany({
     data: [
-      { id: "TECH-001", name: "Arjun", phone: "9876543201", email: "arjun@shifterz.in", status: "Active" },
-      { id: "TECH-002", name: "Sathish", phone: "9876543202", email: "sathish@shifterz.in", status: "Active" },
-      { id: "TECH-003", name: "Mani", phone: "9876543203", email: "mani@shifterz.in", status: "Active" },
-      { id: "TECH-004", name: "Kumar", phone: "9876543204", email: "kumar@shifterz.in", status: "Active" },
+      { id: "TECH-001", name: "Arjun", username: "arjun", password: techPassword, phone: "9876543201", email: "arjun@shifterz.in", status: "Active" },
+      { id: "TECH-002", name: "Sathish", username: "sathish", password: techPassword, phone: "9876543202", email: "sathish@shifterz.in", status: "Active" },
+      { id: "TECH-003", name: "Mani", username: "mani", password: techPassword, phone: "9876543203", email: "mani@shifterz.in", status: "Active" },
+      { id: "TECH-004", name: "Kumar", username: "kumar", password: techPassword, phone: "9876543204", email: "kumar@shifterz.in", status: "Active" },
     ],
   });
 

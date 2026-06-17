@@ -129,6 +129,8 @@ model Job {
   estCompletion    String
   actualCompletion String?
   notes            String
+  photos           String[]
+  technicianId     String?
 }
 
 model OutPass {
@@ -161,11 +163,13 @@ model Setting {
 }
 
 model Technician {
-  id     String  @id
-  name   String
-  phone  String?
-  email  String?
-  status String  @default("Active")
+  id       String  @id
+  name     String
+  phone    String?
+  email    String?
+  status   String  @default("Active")
+  username String? @unique
+  password String?
 }
 
 model User {
