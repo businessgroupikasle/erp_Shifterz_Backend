@@ -2,8 +2,22 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../lib/db.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import multer from "multer";
+import path from "path";
 
 export const apiRouter = Router();
+
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(process.cwd(), "public/uploads"));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
 
 // Counters for sequential ID generation
 const idCounters: Record<string, number> = {
@@ -58,31 +72,45 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const user = await db.user.findUnique({ where: { username } });
+    let user = await db.user.findUnique({ where: { username } });
+    let isTechnician = false;
+    let techData = null;
+
     if (!user) {
-      res.status(401).json({ error: "Invalid username or password" });
-      return;
+      // Check technician table
+      techData = await db.technician.findUnique({ where: { username } });
+      if (!techData || !techData.password) {
+        res.status(401).json({ error: "Invalid username or password" });
+        return;
+      }
+      
+      const isValidTech = await bcrypt.compare(password, techData.password);
+      if (!isValidTech) {
+        res.status(401).json({ error: "Invalid username or password" });
+        return;
+      }
+      isTechnician = true;
+    } else {
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        res.status(401).json({ error: "Invalid username or password" });
+        return;
+      }
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
-      res.status(401).json({ error: "Invalid username or password" });
-      return;
-    }
+    const tokenPayload = isTechnician 
+      ? { id: techData!.id, username: techData!.username, role: "technician", technicianId: techData!.id }
+      : { id: user!.id, username: user!.username, role: user!.role };
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      tokenPayload,
       process.env.JWT_SECRET || "shifterz_secret_key",
       { expiresIn: "1d" }
     );
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-      },
+      user: tokenPayload,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -104,17 +132,30 @@ apiRouter.get("/auth/me", async (req: Request, res: Response): Promise<void> => 
     }
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key") as any;
 
+    let userData = null;
+    let isTechnician = decoded.role === "technician";
 
-    const user = await db.user.findUnique({ where: { id: decoded.id } });
-    if (!user) {
-      res.status(401).json({ error: "User not found" });
-      return;
+    if (isTechnician) {
+      userData = await db.technician.findUnique({ where: { id: decoded.id } });
+      if (!userData) {
+        res.status(401).json({ error: "Technician not found" });
+        return;
+      }
+    } else {
+      userData = await db.user.findUnique({ where: { id: decoded.id } });
+      if (!userData) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
     }
 
     res.json({
-      id: user.id,
-      username: user.username,
-      role: user.role,
+      user: {
+        id: userData.id,
+        username: userData.username,
+        role: decoded.role,
+        ...(isTechnician ? { technicianId: userData.id } : {})
+      },
     });
   } catch (error: any) {
     res.status(401).json({ error: "Invalid or expired token" });
@@ -124,6 +165,21 @@ apiRouter.get("/auth/me", async (req: Request, res: Response): Promise<void> => 
 
 
 
+// ═══════════════════════════════════════════════════════════════
+// UPLOADS
+// ═══════════════════════════════════════════════════════════════
+apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response): void => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    // Return the public URL for the uploaded file
+    res.json({ url: `/uploads/${req.file.filename}` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════
 // DASHBOARD ANALYTICS
@@ -689,9 +745,18 @@ apiRouter.put("/invoices/:id", async (req: Request, res: Response) => {
     const updated = await db.invoice.update({
       where: { id },
       data: {
-        status: data.status,
-        notes: data.notes,
-        dueDate: data.dueDate,
+        status: data.status !== undefined ? data.status : undefined,
+        notes: data.notes !== undefined ? data.notes : undefined,
+        dueDate: data.dueDate !== undefined ? data.dueDate : undefined,
+        amount: data.amount !== undefined ? Number(data.amount) : undefined,
+        gst: data.gst !== undefined ? Number(data.gst) : undefined,
+        discount: data.discount !== undefined ? Number(data.discount) : undefined,
+        type: data.type !== undefined ? data.type : undefined,
+        client: data.client !== undefined ? data.client : undefined,
+        phone: data.phone !== undefined ? data.phone : undefined,
+        vehicle: data.vehicle !== undefined ? data.vehicle : undefined,
+        service: data.service !== undefined ? data.service : undefined,
+        paidAmount: data.paidAmount !== undefined ? Number(data.paidAmount) : undefined,
         items: data.items !== undefined ? data.items : undefined,
         bankDetails: data.bankDetails !== undefined ? data.bankDetails : undefined,
         paymentTerms: data.paymentTerms !== undefined ? data.paymentTerms : undefined,
@@ -937,9 +1002,36 @@ apiRouter.delete("/inventory/:id", async (req: Request, res: Response) => {
 // ═══════════════════════════════════════════════════════════════
 // JOB CARDS
 // ═══════════════════════════════════════════════════════════════
-apiRouter.get("/jobs", async (req: Request, res: Response) => {
+apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
   try {
-    const list = await db.job.findMany({ orderBy: { estCompletion: "asc" } });
+    let filter = {};
+    const authHeader = req.headers.authorization;
+    let userInfo = { role: "admin", technicianId: null };
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+          userInfo = { role: decoded.role, technicianId: decoded.technicianId };
+
+          if (decoded.role === "technician" && decoded.technicianId) {
+            filter = { technicianId: decoded.technicianId };
+          }
+        } catch (e) {
+          // ignore invalid token for filtering purposes
+        }
+      }
+    }
+
+    const list = await db.job.findMany({
+      where: filter,
+      orderBy: { estCompletion: "asc" }
+    });
+
+    // Debug info
+    console.log(`[Jobs API] User Role: ${userInfo.role}, TechnicianId: ${userInfo.technicianId}, Filter: ${JSON.stringify(filter)}, Results: ${list.length}`);
+
     res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -950,6 +1042,14 @@ apiRouter.post("/jobs", async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const jobId = await generateSequentialId("JOB");
+    
+    // Lookup technicianId if not provided
+    let techId = data.technicianId || null;
+    if (!techId && data.technician) {
+      const techRecord = await db.technician.findFirst({ where: { name: data.technician } });
+      if (techRecord) techId = techRecord.id;
+    }
+
     const newJob = await db.job.create({
       data: {
         id: jobId,
@@ -957,12 +1057,14 @@ apiRouter.post("/jobs", async (req: Request, res: Response) => {
         customer: data.customer || "",
         service: data.service || "",
         technician: data.technician || "",
+        technicianId: techId,
         status: data.status || "Pending",
         priority: data.priority || "Normal",
         startDate: data.startDate || new Date().toISOString().slice(0, 10),
         estCompletion: data.estCompletion || new Date().toISOString().slice(0, 10),
         actualCompletion: null,
         notes: data.notes || "",
+        photos: data.photos || [],
       },
     });
     res.json(newJob);
@@ -979,11 +1081,13 @@ apiRouter.put("/jobs/:id", async (req: Request, res: Response) => {
       where: { id },
       data: {
         technician: data.technician,
+        technicianId: data.technicianId,
         status: data.status,
         priority: data.priority,
         estCompletion: data.estCompletion,
         actualCompletion: data.actualCompletion || null,
         notes: data.notes,
+        photos: data.photos,
       },
     });
     res.json(updated);
@@ -1209,15 +1313,21 @@ apiRouter.put("/settings", async (req: Request, res: Response) => {
     });
 
     if (Array.isArray(technicians)) {
+      // Instead of deleting all and losing passwords, we should ideally upsert.
+      // But to match existing behavior simply, we recreate them with default passwords.
       await db.technician.deleteMany();
+      const defaultPassword = await bcrypt.hash("tech123", 10);
       for (const t of technicians) {
+        const baseUsername = typeof t === 'string' ? t.replace(/\s+/g, "").toLowerCase() : "tech";
         await db.technician.create({
           data: {
             id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
             name: t,
             phone: "",
             email: "",
-            status: "Active"
+            status: "Active",
+            username: baseUsername,
+            password: defaultPassword,
           }
         });
       }
@@ -1245,6 +1355,14 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const techId = uid("TECH");
+    
+    // Auto-generate username from name if not provided, strip spaces
+    const baseUsername = data.username || data.name.replace(/\s+/g, "").toLowerCase();
+    
+    // Hash default password if provided, else "tech123"
+    const rawPassword = data.password || "tech123";
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
     const newTech = await db.technician.create({
       data: {
         id: techId,
@@ -1252,6 +1370,8 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
         phone: data.phone || null,
         email: data.email || null,
         status: data.status || "Active",
+        username: baseUsername,
+        password: hashedPassword,
       },
     });
     res.json(newTech);
