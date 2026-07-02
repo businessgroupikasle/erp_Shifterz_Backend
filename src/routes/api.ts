@@ -502,6 +502,25 @@ apiRouter.put("/carin/:id/checkout", async (req: Request, res: Response) => {
   }
 });
 
+// Delete a car entry
+apiRouter.delete("/carin/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    
+    // Delete any associated OutPass first due to logical relation (though no strict database constraint, it keeps data clean)
+    await db.outPass.deleteMany({ where: { carInId: id } });
+
+    await db.carIn.delete({
+      where: { id },
+    });
+
+    res.json({ success: true, message: "Car entry deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // ═══════════════════════════════════════════════════════════════
 // OUT PASS
 // ═══════════════════════════════════════════════════════════════
@@ -1026,7 +1045,7 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
 
     const list = await db.job.findMany({
       where: filter,
-      orderBy: { estCompletion: "asc" }
+      orderBy: { id: "desc" }
     });
 
     // Debug info
