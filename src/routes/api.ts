@@ -32,27 +32,27 @@ const idCounters: Record<string, number> = {
 // Helper to generate sequential IDs
 const generateSequentialId = async (prefix: string): Promise<string> => {
   if (idCounters[prefix] === 0) {
-     let maxId = 0;
-     let model: any = null;
-     if (prefix === "CUS") model = db.customer;
-     else if (prefix === "INV" || prefix === "QT" || prefix === "EST") model = db.invoice;
-     else if (prefix === "L") model = db.lead;
-     else if (prefix === "JOB") model = db.job;
+    let maxId = 0;
+    let model: any = null;
+    if (prefix === "CUS") model = db.customer;
+    else if (prefix === "INV" || prefix === "QT" || prefix === "EST") model = db.invoice;
+    else if (prefix === "L") model = db.lead;
+    else if (prefix === "JOB") model = db.job;
 
-     if (model) {
-       const allRecords = await model.findMany({
-         where: { id: { startsWith: prefix } },
-         select: { id: true }
-       });
-       for (const record of allRecords) {
-         const numStr = record.id.replace(prefix, "");
-         const num = parseInt(numStr, 10);
-         if (!isNaN(num) && num > maxId) {
-           maxId = num;
-         }
-       }
-     }
-     idCounters[prefix] = maxId;
+    if (model) {
+      const allRecords = await model.findMany({
+        where: { id: { startsWith: prefix } },
+        select: { id: true }
+      });
+      for (const record of allRecords) {
+        const numStr = record.id.replace(prefix, "");
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxId) {
+          maxId = num;
+        }
+      }
+    }
+    idCounters[prefix] = maxId;
   }
   idCounters[prefix] = (idCounters[prefix] || 0) + 1;
   return `${prefix}${String(idCounters[prefix]).padStart(3, "0")}`;
@@ -83,7 +83,7 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
         res.status(401).json({ error: "Invalid username or password" });
         return;
       }
-      
+
       const isValidTech = await bcrypt.compare(password, techData.password);
       if (!isValidTech) {
         res.status(401).json({ error: "Invalid username or password" });
@@ -98,7 +98,7 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
       }
     }
 
-    const tokenPayload = isTechnician 
+    const tokenPayload = isTechnician
       ? { id: techData!.id, username: techData!.username, role: "technician", technicianId: techData!.id, franchiseId: techData!.franchiseId }
       : { id: user!.id, username: user!.username, role: user!.role, franchiseId: user!.franchiseId };
 
@@ -194,7 +194,7 @@ apiRouter.get("/dashboard-legacy", async (req: Request, res: Response): Promise<
 
     const activeLeadsCount = leads.filter(l => l.status === "New" || l.status === "Follow Up").length;
     const carsInWorkshop = cars.filter(c => c.status === "In Workshop");
-    
+
     // Revenue calculations: paid invoices
     const totalRev = invoices
       .filter(i => i.status === "Paid")
@@ -506,7 +506,7 @@ apiRouter.put("/carin/:id/checkout", async (req: Request, res: Response) => {
 apiRouter.delete("/carin/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    
+
     // Delete any associated OutPass first due to logical relation (though no strict database constraint, it keeps data clean)
     await db.outPass.deleteMany({ where: { carInId: id } });
 
@@ -707,9 +707,9 @@ apiRouter.delete("/leads/:id", async (req: Request, res: Response) => {
 apiRouter.get("/invoices", async (req: Request, res: Response) => {
   try {
     const list = await db.invoice.findMany({ orderBy: { date: "desc" } });
-    
+
     const payments = await db.payment.findMany();
-    
+
     const listWithPaidAmount = list.map(inv => {
       const invPayments = payments.filter(p => p.invoiceId === inv.id);
       const paidAmount = invPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -819,7 +819,7 @@ apiRouter.get("/payments", async (req: Request, res: Response) => {
 apiRouter.post("/payments", async (req: Request, res: Response): Promise<void> => {
   try {
     const data = req.body;
-    
+
     // Find invoice
     const invoice = await db.invoice.findUnique({
       where: { id: data.invoiceId },
@@ -1045,7 +1045,7 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
 
     const list = await db.job.findMany({
       where: filter,
-      orderBy: { id: "desc" }
+      orderBy: { createdAt: "desc" }
     });
 
     // Debug info
@@ -1061,7 +1061,7 @@ apiRouter.post("/jobs", async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const jobId = await generateSequentialId("JOB");
-    
+
     // Lookup technicianId if not provided
     let techId = data.technicianId || null;
     if (!techId && data.technician) {
@@ -1301,7 +1301,7 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
 apiRouter.put("/settings", async (req: Request, res: Response) => {
   try {
     const { companyInfo, technicians, salesAgents, categories, securityGuards } = req.body;
-    
+
     const settings = await db.setting.upsert({
       where: { id: "default" },
       update: {
@@ -1374,10 +1374,10 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const techId = uid("TECH");
-    
+
     // Auto-generate username from name if not provided, strip spaces
     const baseUsername = data.username || data.name.replace(/\s+/g, "").toLowerCase();
-    
+
     // Hash default password if provided, else "tech123"
     const rawPassword = data.password || "tech123";
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
