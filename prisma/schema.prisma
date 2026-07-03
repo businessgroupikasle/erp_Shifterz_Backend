@@ -21,6 +21,8 @@ model Lead {
   date        String
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Invoice {
@@ -45,6 +47,8 @@ model Invoice {
   authorizedSignatory String?
   franchiseId         String?
   franchise           Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Payment {
@@ -58,6 +62,8 @@ model Payment {
   notes       String
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Inventory {
@@ -72,6 +78,8 @@ model Inventory {
   location    String
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Service {
@@ -82,6 +90,8 @@ model Service {
   duration String
   warranty String
   desc     String
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Franchise {
@@ -110,11 +120,12 @@ model Franchise {
   carIns            CarIn[]
   jobsList          Job[]
   outPasses         OutPass[]
-  technicians       Technician[]
-  users             User[]
+  employees         Employee[]
   attendances       Attendance[]
   inventoryRequests InventoryRequest[]
   appointments      Appointment[]
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Customer {
@@ -129,6 +140,8 @@ model Customer {
   lastVisit   String
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model CarIn {
@@ -147,6 +160,8 @@ model CarIn {
   jobCardId    String
   franchiseId  String?
   franchise    Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted    Boolean    @default(false)
+  deletedAt    String?
 }
 
 model Job {
@@ -165,6 +180,8 @@ model Job {
   technicianId     String?
   franchiseId      String?
   franchise        Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted        Boolean    @default(false)
+  deletedAt        String?
 }
 
 model OutPass {
@@ -182,6 +199,8 @@ model OutPass {
   carInId        String
   franchiseId    String?
   franchise      Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Setting {
@@ -196,27 +215,24 @@ model Setting {
   agents         String[]
   categories     String[]
   securityGuards String[]
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
-model Technician {
-  id          String     @id
-  name        String
-  phone       String?
-  email       String?
-  status      String     @default("Active")
-  username    String?    @unique
-  password    String?
-  franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
-}
-
-model User {
-  id          String     @id
-  username    String     @unique
-  password    String
-  role        String     @default("admin") // e.g. SUPER_ADMIN, FRANCHISE_ADMIN
-  franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+model Employee {
+  id           String     @id
+  name         String
+  phone        String?
+  email        String?
+  status       String     @default("Active")
+  username     String?    @unique
+  password     String?
+  role         String     @default("TECHNICIAN") // SUPER_ADMIN, HQ_USER, FRANCHISE_ADMIN, RECEPTIONIST, SERVICE_ADVISOR, TECHNICIAN, BILLING
+  hqControlled Boolean    @default(false)
+  franchiseId  String?
+  franchise    Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Attendance {
@@ -228,6 +244,8 @@ model Attendance {
   clockOut    String?
   franchiseId String?
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model InventoryRequest {
@@ -238,6 +256,8 @@ model InventoryRequest {
   date              String
   franchiseId       String?
   franchise         Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }
 
 model Appointment {
@@ -250,4 +270,6 @@ model Appointment {
   status        String // Scheduled, Arrived, Cancelled
   franchiseId   String?
   franchise     Franchise? @relation(fields: [franchiseId], references: [id])
+  isDeleted   Boolean    @default(false)
+  deletedAt   String?
 }

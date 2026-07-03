@@ -68,33 +68,23 @@ apiRouter.post("/auth/login", async (req, res) => {
             res.status(400).json({ error: "Username and password are required" });
             return;
         }
-        let user = await db.user.findUnique({ where: { username } });
-        let isTechnician = false;
-        let techData = null;
-        if (!user) {
-            // Check technician table
-            techData = await db.technician.findUnique({ where: { username } });
-            if (!techData || !techData.password) {
-                res.status(401).json({ error: "Invalid username or password" });
-                return;
-            }
-            const isValidTech = await bcrypt.compare(password, techData.password);
-            if (!isValidTech) {
-                res.status(401).json({ error: "Invalid username or password" });
-                return;
-            }
-            isTechnician = true;
+        let user = await db.employee.findUnique({ where: { username } });
+        if (!user || !user.password) {
+            res.status(401).json({ error: "Invalid username or password" });
+            return;
         }
-        else {
-            const isValid = await bcrypt.compare(password, user.password);
-            if (!isValid) {
-                res.status(401).json({ error: "Invalid username or password" });
-                return;
-            }
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            res.status(401).json({ error: "Invalid username or password" });
+            return;
         }
-        const tokenPayload = isTechnician
-            ? { id: techData.id, username: techData.username, role: "technician", technicianId: techData.id, franchiseId: techData.franchiseId }
-            : { id: user.id, username: user.username, role: user.role, franchiseId: user.franchiseId };
+        const tokenPayload = {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            franchiseId: user.franchiseId,
+            ...(user.role === "TECHNICIAN" ? { technicianId: user.id } : {})
+        };
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || "shifterz_secret_key", { expiresIn: "1d" });
         res.json({
             token,
@@ -118,28 +108,18 @@ apiRouter.get("/auth/me", async (req, res) => {
             return;
         }
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
-        let userData = null;
-        let isTechnician = decoded.role === "technician";
-        if (isTechnician) {
-            userData = await db.technician.findUnique({ where: { id: decoded.id } });
-            if (!userData) {
-                res.status(401).json({ error: "Technician not found" });
-                return;
-            }
-        }
-        else {
-            userData = await db.user.findUnique({ where: { id: decoded.id } });
-            if (!userData) {
-                res.status(401).json({ error: "User not found" });
-                return;
-            }
+        const userData = await db.employee.findUnique({ where: { id: decoded.id } });
+        if (!userData) {
+            res.status(401).json({ error: "User not found" });
+            return;
         }
         res.json({
             user: {
                 id: userData.id,
                 username: userData.username,
-                role: decoded.role,
-                ...(isTechnician ? { technicianId: userData.id } : {})
+                role: userData.role,
+                franchiseId: userData.franchiseId,
+                ...(userData.role === "TECHNICIAN" ? { technicianId: userData.id } : {})
             },
         });
     }
@@ -539,7 +519,19 @@ apiRouter.put("/outpass/:id", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/leads", async (req, res) => {
     try {
-        const list = await db.lead.findMany({ orderBy: { date: "desc" } });
+        let tenantFilter = {};
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+                    tenantFilter = { franchiseId: decoded.franchiseId };
+                }
+            }
+            catch (e) { }
+        }
+        const list = await db.lead.findMany({ where: tenantFilter, orderBy: { date: "desc" } });
         res.json(list);
     }
     catch (error) {
@@ -549,6 +541,16 @@ apiRouter.get("/leads", async (req, res) => {
 apiRouter.post("/leads", async (req, res) => {
     try {
         const data = req.body;
+        let franchiseId = null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                franchiseId = decoded.franchiseId || null;
+            }
+            catch (e) { }
+        }
         const newLead = await db.lead.create({
             data: {
                 id: await generateSequentialId("L"),
@@ -563,6 +565,7 @@ apiRouter.post("/leads", async (req, res) => {
                 notes: data.notes || "",
                 budget: String(data.budget || "0"),
                 date: data.date || new Date().toISOString().slice(0, 10),
+                franchiseId: franchiseId,
             },
         });
         if (newLead.status === "Converted" && newLead.phone) {
@@ -578,7 +581,8 @@ apiRouter.post("/leads", async (req, res) => {
                         model: "",
                         visits: 0,
                         totalSpend: 0,
-                        lastVisit: new Date().toISOString().slice(0, 10)
+                        lastVisit: new Date().toISOString().slice(0, 10),
+                        franchiseId: franchiseId,
                     }
                 });
             }
@@ -643,7 +647,7 @@ apiRouter.put("/leads/:id", async (req, res) => {
 apiRouter.delete("/leads/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.lead.delete({ where: { id } });
+        await db.lead.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true, message: "Lead deleted" });
     }
     catch (error) {
@@ -816,7 +820,7 @@ apiRouter.post("/payments", async (req, res) => {
 apiRouter.delete("/payments/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.payment.delete({ where: { id } });
+        await db.payment.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true, message: "Payment deleted" });
     }
     catch (error) {
@@ -880,7 +884,7 @@ apiRouter.put("/services/:id", async (req, res) => {
 apiRouter.delete("/services/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.service.delete({ where: { id } });
+        await db.service.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true });
     }
     catch (error) {
@@ -948,7 +952,7 @@ apiRouter.put("/inventory/:id", async (req, res) => {
 apiRouter.delete("/inventory/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.inventory.delete({ where: { id } });
+        await db.inventory.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true });
     }
     catch (error) {
@@ -997,7 +1001,7 @@ apiRouter.post("/jobs", async (req, res) => {
         // Lookup technicianId if not provided
         let techId = data.technicianId || null;
         if (!techId && data.technician) {
-            const techRecord = await db.technician.findFirst({ where: { name: data.technician } });
+            const techRecord = await db.employee.findFirst({ where: { name: data.technician } });
             if (techRecord)
                 techId = techRecord.id;
         }
@@ -1050,7 +1054,7 @@ apiRouter.put("/jobs/:id", async (req, res) => {
 apiRouter.delete("/jobs/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.job.delete({ where: { id } });
+        await db.job.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true, message: "Job deleted" });
     }
     catch (error) {
@@ -1132,7 +1136,7 @@ apiRouter.put("/franchise/:id", async (req, res) => {
 apiRouter.delete("/franchise/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.franchise.delete({ where: { id } });
+        await db.franchise.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true, message: "Franchise deleted" });
     }
     catch (error) {
@@ -1177,7 +1181,7 @@ apiRouter.post("/customers", async (req, res) => {
 apiRouter.delete("/customers/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.customer.delete({ where: { id } });
+        await db.customer.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true, message: "Customer deleted" });
     }
     catch (error) {
@@ -1209,7 +1213,7 @@ apiRouter.get("/settings", async (req, res) => {
                 },
             });
         }
-        const techs = await db.technician.findMany();
+        const techs = await db.employee.findMany();
         res.json({
             companyInfo: {
                 name: settings.companyName,
@@ -1263,11 +1267,11 @@ apiRouter.put("/settings", async (req, res) => {
         if (Array.isArray(technicians)) {
             // Instead of deleting all and losing passwords, we should ideally upsert.
             // But to match existing behavior simply, we recreate them with default passwords.
-            await db.technician.deleteMany();
+            await db.employee.deleteMany();
             const defaultPassword = await bcrypt.hash("tech123", 10);
             for (const t of technicians) {
                 const baseUsername = typeof t === 'string' ? t.replace(/\s+/g, "").toLowerCase() : "tech";
-                await db.technician.create({
+                await db.employee.create({
                     data: {
                         id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
                         name: t,
@@ -1291,7 +1295,7 @@ apiRouter.put("/settings", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/technicians", async (req, res) => {
     try {
-        const list = await db.technician.findMany();
+        const list = await db.employee.findMany();
         res.json(list);
     }
     catch (error) {
@@ -1302,12 +1306,37 @@ apiRouter.post("/technicians", async (req, res) => {
     try {
         const data = req.body;
         const techId = uid("TECH");
+        // Enforce 6 franchise users limit
+        const authHeader = req.headers.authorization;
+        let franchiseId = null;
+        let role = "TECHNICIAN";
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                franchiseId = decoded.franchiseId || null;
+                if (decoded.role === "SUPER_ADMIN" || decoded.role === "HQ_USER") {
+                    // If created by HQ, maybe it's not bound by strict limits or they can set franchise
+                    franchiseId = data.franchiseId || null;
+                }
+            }
+            catch (e) { }
+        }
+        if (franchiseId) {
+            const userCount = await db.employee.count({ where: { franchiseId } });
+            // Count excludes FRANCHISE_ADMIN if we strictly say "6 franchise users in addition to Admin", 
+            // but let's just limit total employees per franchise to 6 for now.
+            if (userCount >= 6) {
+                res.status(403).json({ error: "License limit reached. Maximum 6 users allowed per franchise." });
+                return;
+            }
+        }
         // Auto-generate username from name if not provided, strip spaces
         const baseUsername = data.username || data.name.replace(/\s+/g, "").toLowerCase();
         // Hash default password if provided, else "tech123"
         const rawPassword = data.password || "tech123";
         const hashedPassword = await bcrypt.hash(rawPassword, 10);
-        const newTech = await db.technician.create({
+        const newTech = await db.employee.create({
             data: {
                 id: techId,
                 name: data.name,
@@ -1316,6 +1345,8 @@ apiRouter.post("/technicians", async (req, res) => {
                 status: data.status || "Active",
                 username: baseUsername,
                 password: hashedPassword,
+                franchiseId: franchiseId,
+                role: data.role || "TECHNICIAN",
             },
         });
         res.json(newTech);
@@ -1327,7 +1358,7 @@ apiRouter.post("/technicians", async (req, res) => {
 apiRouter.delete("/technicians/:id", async (req, res) => {
     try {
         const id = String(req.params.id);
-        await db.technician.delete({ where: { id } });
+        await db.employee.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
         res.json({ success: true });
     }
     catch (error) {

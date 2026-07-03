@@ -51,9 +51,10 @@ hqRouter.post("/franchises", async (req: Request, res: Response): Promise<void> 
       if (adminUsername && adminPassword) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         const userId = `USR${Date.now().toString(36).toUpperCase()}`;
-        await tx.user.create({
+        await tx.employee.create({
           data: {
             id: userId,
+            name: adminUsername,
             username: adminUsername,
             password: hashedPassword,
             role: "FRANCHISE_ADMIN",
@@ -111,10 +112,11 @@ hqRouter.post("/users", async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = `USR${Date.now().toString(36).toUpperCase()}`;
 
-    const newUser = await db.user.create({
+    const newUser = await db.employee.create({
       data: {
         id: userId,
         username,
+        name: username, // Employee requires name
         password: hashedPassword,
         role,
         franchiseId: franchiseId || null,
