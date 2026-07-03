@@ -93,8 +93,8 @@ apiRouter.post("/auth/login", async (req, res) => {
             }
         }
         const tokenPayload = isTechnician
-            ? { id: techData.id, username: techData.username, role: "technician", technicianId: techData.id }
-            : { id: user.id, username: user.username, role: user.role };
+            ? { id: techData.id, username: techData.username, role: "technician", technicianId: techData.id, franchiseId: techData.franchiseId }
+            : { id: user.id, username: user.username, role: user.role, franchiseId: user.franchiseId };
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || "shifterz_secret_key", { expiresIn: "1d" });
         res.json({
             token,
@@ -166,7 +166,7 @@ apiRouter.post("/upload", upload.single("file"), (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DASHBOARD ANALYTICS
 // ═══════════════════════════════════════════════════════════════
-apiRouter.get("/dashboard", async (req, res) => {
+apiRouter.get("/dashboard-legacy", async (req, res) => {
     try {
         const leads = await db.lead.findMany();
         const invoices = await db.invoice.findMany();
@@ -453,6 +453,21 @@ apiRouter.put("/carin/:id/checkout", async (req, res) => {
             });
         }
         res.json(updatedCar);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// Delete a car entry
+apiRouter.delete("/carin/:id", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        // Delete any associated OutPass first due to logical relation (though no strict database constraint, it keeps data clean)
+        await db.outPass.deleteMany({ where: { carInId: id } });
+        await db.carIn.delete({
+            where: { id },
+        });
+        res.json({ success: true, message: "Car entry deleted" });
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -965,7 +980,7 @@ apiRouter.get("/jobs", async (req, res) => {
         }
         const list = await db.job.findMany({
             where: filter,
-            orderBy: { estCompletion: "asc" }
+            orderBy: { id: "desc" }
         });
         // Debug info
         console.log(`[Jobs API] User Role: ${userInfo.role}, TechnicianId: ${userInfo.technicianId}, Filter: ${JSON.stringify(filter)}, Results: ${list.length}`);

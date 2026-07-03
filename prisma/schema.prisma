@@ -7,32 +7,34 @@ generator client {
 }
 
 model Lead {
-  id         String   @id
-  name       String
-  phone      String
-  email      String
-  source     String
-  service    String
-  vehicle    String
-  assignedTo String
-  status     String
-  notes      String
-  budget     String
-  date       String
+  id          String     @id
+  name        String
+  phone       String
+  email       String
+  source      String
+  service     String
+  vehicle     String
+  assignedTo  String
+  status      String
+  notes       String
+  budget      String
+  date        String
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Invoice {
-  id        String   @id
-  type      String
-  client    String
-  phone     String
-  vehicle   String
-  service   String
-  amount    Float
-  gst       Float
-  discount  Float
-  status    String
-  date      String
+  id                  String     @id
+  type                String
+  client              String
+  phone               String
+  vehicle             String
+  service             String
+  amount              Float
+  gst                 Float
+  discount            Float
+  status              String
+  date                String
   dueDate             String
   notes               String
   gstNumber           String?
@@ -41,29 +43,35 @@ model Invoice {
   paymentTerms        String?
   deliveryTerms       String?
   authorizedSignatory String?
+  franchiseId         String?
+  franchise           Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Payment {
-  id        String   @id
-  invoiceId String
-  client    String
-  amount    Float
-  mode      String
-  date      String
-  ref       String
-  notes     String
+  id          String     @id
+  invoiceId   String
+  client      String
+  amount      Float
+  mode        String
+  date        String
+  ref         String
+  notes       String
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Inventory {
-  id       String @id
-  name     String
-  unit     String
-  category String
-  stock    Int
-  reorder  Int
-  cost     Float
-  supplier String
-  location String
+  id          String     @id
+  name        String
+  unit        String
+  category    String
+  stock       Int
+  reorder     Int
+  cost        Float
+  supplier    String
+  location    String
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Service {
@@ -77,32 +85,54 @@ model Service {
 }
 
 model Franchise {
-  id         String @id
-  name       String
-  city       String
-  owner      String
-  phone      String
-  since      String
-  revenue    Float
-  jobs       Int
-  royaltyPct Float
-  status     String
+  id                String             @id
+  name              String
+  city              String
+  owner             String
+  phone             String
+  since             String
+  revenue           Float
+  jobs              Int
+  royaltyPct        Float
+  status            String
+  businessName      String?
+  gstNumber         String?
+  email             String?
+  address           String?
+  state             String?
+  pinCode           String?
+  licenseStatus     String? @default("Active")
+  leads             Lead[]
+  invoices          Invoice[]
+  payments          Payment[]
+  inventory         Inventory[]
+  customers         Customer[]
+  carIns            CarIn[]
+  jobsList          Job[]
+  outPasses         OutPass[]
+  technicians       Technician[]
+  users             User[]
+  attendances       Attendance[]
+  inventoryRequests InventoryRequest[]
+  appointments      Appointment[]
 }
 
 model Customer {
-  id         String @id
-  name       String
-  phone      String
-  email      String
-  vehicle    String
-  model      String
-  visits     Int
-  totalSpend Float
-  lastVisit  String
+  id          String     @id
+  name        String
+  phone       String
+  email       String
+  vehicle     String
+  model       String
+  visits      Int
+  totalSpend  Float
+  lastVisit   String
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model CarIn {
-  id           String  @id
+  id           String     @id
   vehicle      String
   model        String
   customer     String
@@ -115,10 +145,12 @@ model CarIn {
   odometer     String
   notes        String
   jobCardId    String
+  franchiseId  String?
+  franchise    Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Job {
-  id               String  @id
+  id               String     @id
   vehicle          String
   customer         String
   service          String
@@ -131,10 +163,12 @@ model Job {
   notes            String
   photos           String[]
   technicianId     String?
+  franchiseId      String?
+  franchise        Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model OutPass {
-  id             String  @id
+  id             String     @id
   vehicle        String
   model          String
   customer       String
@@ -146,36 +180,74 @@ model OutPass {
   remarks        String
   issued         Boolean
   carInId        String
+  franchiseId    String?
+  franchise      Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Setting {
-  id          String   @id @default("default")
-  companyName String
-  address     String
-  phone       String
-  email       String
-  gstin       String
-  gstPct      Float
-  currency    String
-  agents      String[]
-  categories  String[]
+  id             String   @id @default("default")
+  companyName    String
+  address        String
+  phone          String
+  email          String
+  gstin          String
+  gstPct         Float
+  currency       String
+  agents         String[]
+  categories     String[]
   securityGuards String[]
 }
 
 model Technician {
-  id       String  @id
-  name     String
-  phone    String?
-  email    String?
-  status   String  @default("Active")
-  username String? @unique
-  password String?
+  id          String     @id
+  name        String
+  phone       String?
+  email       String?
+  status      String     @default("Active")
+  username    String?    @unique
+  password    String?
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model User {
-  id       String @id
-  username String @unique
-  password String
-  role     String @default("admin")
+  id          String     @id
+  username    String     @unique
+  password    String
+  role        String     @default("admin") // e.g. SUPER_ADMIN, FRANCHISE_ADMIN
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
+model Attendance {
+  id          String     @id @default(cuid())
+  employeeId  String
+  date        String
+  status      String // Present, Absent, Leave
+  clockIn     String?
+  clockOut    String?
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
+}
+
+model InventoryRequest {
+  id                String     @id @default(cuid())
+  itemId            String
+  quantityRequested Int
+  status            String // Pending, Approved, Rejected
+  date              String
+  franchiseId       String?
+  franchise         Franchise? @relation(fields: [franchiseId], references: [id])
+}
+
+model Appointment {
+  id            String     @id @default(cuid())
+  customerId    String?
+  customerName  String
+  vehicle       String
+  scheduledDate String
+  service       String
+  status        String // Scheduled, Arrived, Cancelled
+  franchiseId   String?
+  franchise     Franchise? @relation(fields: [franchiseId], references: [id])
+}

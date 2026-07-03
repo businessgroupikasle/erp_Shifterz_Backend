@@ -56,16 +56,26 @@ async function main() {
     ],
   });
 
-  // Admin User
+  // Admin Users
   const hashedPassword = await bcrypt.hash("admin123", 10);
-  await prisma.user.create({
-    data: {
-      id: "USR-001",
-      username: "admin",
-      password: hashedPassword,
-      role: "admin",
-    },
+  await prisma.user.createMany({
+    data: [
+      {
+        id: "USR-001",
+        username: "admin",
+        password: hashedPassword,
+        role: "SUPER_ADMIN",
+      },
+      {
+        id: "USR-001-HQ",
+        username: "hqadmin",
+        password: hashedPassword,
+        role: "HQ_USER",
+      }
+    ]
   });
+
+
 
 
   // Services
@@ -140,6 +150,17 @@ async function main() {
   });
 
   // Customers
+  const branchPassword = await bcrypt.hash("branch123", 10);
+  await prisma.user.create({
+    data: {
+      id: "USR-002",
+      username: "branchadmin",
+      password: branchPassword,
+      role: "FRANCHISE_ADMIN",
+      franchiseId: "F001"
+    },
+  });
+
   await prisma.customer.createMany({
     data: [
       { id: "CUS001", name: "Ramesh Kumar", phone: "98765 43210", email: "ramesh@mail.com", vehicle: "TN 04 AB 1234", model: "Toyota Fortuner", visits: 3, totalSpend: 97000, lastVisit: "2026-05-28" },
@@ -169,6 +190,54 @@ async function main() {
     data: [
       { id: "OP001", vehicle: "KL 01 CD 5678", model: "Honda City", customer: "Priya Nair", phone: "87654 32109", service: "C3 Coating", outTime: "2026-05-31T17:45:00", securityName: "Murugan", technicianName: "Sathish", remarks: "All clear. Washed and ready.", issued: true, carInId: "CAR002" },
     ],
+  });
+
+  // Today's Date for Dashboard Metrics
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Attendance
+  await prisma.attendance.createMany({
+    data: [
+      { employeeId: "EMP001", date: todayStr, status: "Present", clockIn: "08:50", franchiseId: "F001" },
+      { employeeId: "EMP002", date: todayStr, status: "Present", clockIn: "08:55", franchiseId: "F001" },
+      { employeeId: "EMP003", date: todayStr, status: "Absent", franchiseId: "F001" },
+      { employeeId: "EMP004", date: todayStr, status: "Present", clockIn: "09:05", franchiseId: "F001" },
+    ],
+  });
+
+  // Appointments
+  await prisma.appointment.createMany({
+    data: [
+      { customerName: "Anita Rao", vehicle: "Hyundai Creta", scheduledDate: todayStr, service: "General Service", status: "Scheduled", franchiseId: "F001" },
+      { customerName: "Vivek Menon", vehicle: "Kia Seltos", scheduledDate: todayStr, service: "Ceramic Coating", status: "Arrived", franchiseId: "F001" },
+      { customerName: "Rajesh S", vehicle: "Mahindra Thar", scheduledDate: todayStr, service: "Interior Detailing", status: "Scheduled", franchiseId: "F001" },
+    ],
+  });
+
+  // Inventory Requests
+  await prisma.inventoryRequest.createMany({
+    data: [
+      { itemId: "ITM001", quantityRequested: 10, status: "Pending", date: todayStr, franchiseId: "F001" },
+      { itemId: "ITM004", quantityRequested: 5, status: "Pending", date: todayStr, franchiseId: "F001" },
+      { itemId: "ITM002", quantityRequested: 2, status: "Approved", date: todayStr, franchiseId: "F001" },
+    ],
+  });
+
+  // Inject a lead, carIn, invoice and job for TODAY so the CRM and Revenue dashboard widgets pop!
+  await prisma.lead.create({
+    data: { id: "L999", name: "Today Lead", phone: "11111 22222", email: "today@mail.com", source: "Walk-in", service: "Wash", vehicle: "TN 99 AA 9999", assignedTo: "Arjun", status: "New", notes: "", date: todayStr, budget: "5000", franchiseId: "F001" }
+  });
+  
+  await prisma.carIn.create({
+    data: { id: "CAR999", vehicle: "TN 99 AA 9999", model: "Maruti Swift", customer: "Today Lead", phone: "11111 22222", service: "Wash", technicianIn: "Arjun", inTime: `${todayStr}T09:00:00`, status: "In Workshop", odometer: "12000", notes: "", jobCardId: "JOB999", franchiseId: "F001" }
+  });
+  
+  await prisma.job.create({
+    data: { id: "JOB999", vehicle: "TN 99 AA 9999", customer: "Today Lead", service: "Wash", technician: "Arjun", status: "In Progress", priority: "Normal", startDate: todayStr, estCompletion: todayStr, notes: "", franchiseId: "F001" }
+  });
+
+  await prisma.invoice.create({
+    data: { id: "INV-TODAY", type: "Invoice", client: "Today Lead", phone: "11111 22222", vehicle: "TN 99 AA 9999", service: "Wash", amount: 5000, gst: 900, discount: 0, status: "Paid", date: todayStr, dueDate: todayStr, notes: "", franchiseId: "F001" }
   });
 
   console.log("Database seeded successfully!");

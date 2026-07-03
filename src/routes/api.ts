@@ -99,8 +99,8 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
     }
 
     const tokenPayload = isTechnician 
-      ? { id: techData!.id, username: techData!.username, role: "technician", technicianId: techData!.id }
-      : { id: user!.id, username: user!.username, role: user!.role };
+      ? { id: techData!.id, username: techData!.username, role: "technician", technicianId: techData!.id, franchiseId: techData!.franchiseId }
+      : { id: user!.id, username: user!.username, role: user!.role, franchiseId: user!.franchiseId };
 
     const token = jwt.sign(
       tokenPayload,
@@ -184,7 +184,7 @@ apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response): 
 // ═══════════════════════════════════════════════════════════════
 // DASHBOARD ANALYTICS
 // ═══════════════════════════════════════════════════════════════
-apiRouter.get("/dashboard", async (req: Request, res: Response): Promise<void> => {
+apiRouter.get("/dashboard-legacy", async (req: Request, res: Response): Promise<void> => {
   try {
     const leads = await db.lead.findMany();
     const invoices = await db.invoice.findMany();
