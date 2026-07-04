@@ -1551,3 +1551,270 @@ apiRouter.get("/reports", async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// EMPLOYEES
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/employees", async (req: Request, res: Response) => {
+  try {
+    let tenantFilter: any = { isDeleted: false };
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+          tenantFilter.franchiseId = decoded.franchiseId;
+        }
+      } catch (e) {}
+    }
+    const list = await db.employee.findMany({ 
+      where: tenantFilter, 
+      orderBy: { id: "asc" },
+      include: { franchise: { select: { id: true, name: true, city: true } } }
+    });
+    res.json(list.map(emp => {
+      const { password, ...rest } = emp;
+      return rest;
+    }));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/employees", async (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    let franchiseId: string | null = data.franchiseId || null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        
+        // Authorization check: Only SUPER_ADMIN and HQ_USER can create employees
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+          res.status(403).json({ error: "Unauthorized: Only HQ can create employees" });
+          return;
+        }
+
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+          franchiseId = decoded.franchiseId;
+        }
+      } catch (e) {}
+    }
+
+    const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
+    
+    const empId = `EMP${Date.now().toString().slice(-6)}`;
+
+    const newEmployee = await db.employee.create({
+      data: {
+        id: empId,
+        name: data.name,
+        phone: data.phone || null,
+        email: data.email || null,
+        status: data.status || "Active",
+        username: data.username || null,
+        password: hashedPassword,
+        role: data.role || "TECHNICIAN",
+        franchiseId: franchiseId,
+      },
+    });
+    
+    const { password, ...rest } = newEmployee;
+    res.json(rest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        
+        // Authorization check: Only SUPER_ADMIN and HQ_USER can edit employees
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+          res.status(403).json({ error: "Unauthorized: Only HQ can edit employees" });
+          return;
+        }
+      } catch (e) {}
+    }
+
+    const id = String(req.params.id);
+    const data = req.body;
+    
+    let updateData: any = {
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      status: data.status,
+      role: data.role,
+      franchiseId: data.franchiseId,
+    };
+
+    if (data.username) updateData.username = data.username;
+    if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+
+    const updated = await db.employee.update({
+      where: { id },
+      data: updateData,
+    });
+
+    const { password, ...rest } = updated;
+    res.json(rest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/employees/:id", async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        
+        // Authorization check: Only SUPER_ADMIN and HQ_USER can delete employees
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+          res.status(403).json({ error: "Unauthorized: Only HQ can delete employees" });
+          return;
+        }
+      } catch (e) {}
+    }
+
+    const id = String(req.params.id);
+    await db.employee.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
+    res.json({ success: true, message: "Employee deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ATTENDANCE
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/attendance", async (req: Request, res: Response) => {
+  try {
+    let tenantFilter: any = { isDeleted: false };
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        
+        if (decoded.role === "SUPER_ADMIN" || decoded.role === "HQ_USER") {
+          // HQ sees all
+        } else if (decoded.role === "FRANCHISE_ADMIN" || decoded.role === "BRANCH_MANAGER") {
+          // Franchise Admin sees their franchise
+          tenantFilter.franchiseId = decoded.franchiseId;
+        } else {
+          // Normal employees see only their own attendance
+          tenantFilter.employeeId = decoded.id;
+        }
+      } catch (e) {}
+    }
+    const list = await db.attendance.findMany({ 
+      where: tenantFilter, 
+      orderBy: { date: "desc" },
+      include: { 
+        franchise: { select: { id: true, name: true, city: true } },
+        employee: { select: { id: true, name: true, role: true } }
+      }
+    });
+    res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/attendance/check-in", async (req: Request, res: Response) => {
+  try {
+    const { employeeId } = req.body;
+    let franchiseId: string | null = null;
+    
+    const emp = await db.employee.findUnique({ where: { id: employeeId } });
+    if (!emp) {
+      res.status(404).json({ error: "Employee not found" });
+      return;
+    }
+    franchiseId = emp.franchiseId;
+
+    const date = new Date().toISOString().slice(0, 10);
+    const clockIn = new Date().toISOString();
+
+    const existing = await db.attendance.findFirst({
+      where: { employeeId, date, isDeleted: false }
+    });
+
+    if (existing) {
+      res.status(400).json({ error: "Already checked in for today" });
+      return;
+    }
+
+    const newAttendance = await db.attendance.create({
+      data: {
+        employeeId,
+        date,
+        status: "Present",
+        clockIn,
+        franchiseId,
+      },
+    });
+
+    res.json(newAttendance);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/attendance/check-out", async (req: Request, res: Response) => {
+  try {
+    const { employeeId } = req.body;
+    const date = new Date().toISOString().slice(0, 10);
+    const clockOut = new Date().toISOString();
+
+    const existing = await db.attendance.findFirst({
+      where: { employeeId, date, isDeleted: false, clockOut: null }
+    });
+
+    if (!existing) {
+      res.status(400).json({ error: "No active check-in found for today" });
+      return;
+    }
+
+    const updated = await db.attendance.update({
+      where: { id: existing.id },
+      data: { clockOut },
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/attendance/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.body;
+    
+    const updated = await db.attendance.update({
+      where: { id },
+      data: {
+        status: data.status,
+        clockIn: data.clockIn,
+        clockOut: data.clockOut,
+      },
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
