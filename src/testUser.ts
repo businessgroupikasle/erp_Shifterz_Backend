@@ -1,7 +1,7 @@
 import { db } from "./lib/db.js";
 
 async function main() {
-  const users = await db.user.findMany({
+  const users = await db.employee.findMany({
     orderBy: { id: 'desc' },
     take: 5
   });
