@@ -85,10 +85,10 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const tokenPayload = { 
-      id: user.id, 
-      username: user.username, 
-      role: user.role, 
+    const tokenPayload = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
       franchiseId: user.franchiseId,
       ...(user.role === "TECHNICIAN" ? { technicianId: user.id } : {})
     };
@@ -313,6 +313,16 @@ apiRouter.get("/carin", async (req: Request, res: Response) => {
 apiRouter.post("/carin", async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    let franchiseId: string | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        franchiseId = decoded.franchiseId || null;
+      } catch (e) { }
+    }
+
     const carId = uid("CAR");
     const jobCardId = await generateSequentialId("JOB");
 
@@ -331,6 +341,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
         odometer: String(data.odometer || "0"),
         notes: data.notes || "",
         jobCardId,
+        franchiseId,
       },
     });
 
@@ -348,6 +359,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
         estCompletion: (data.inTime || new Date().toISOString()).slice(0, 10),
         actualCompletion: null,
         notes: "Auto-created from check-in",
+        franchiseId,
       },
     });
 
@@ -375,6 +387,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
           visits: 1,
           totalSpend: 0,
           lastVisit: new Date().toISOString().slice(0, 10),
+          franchiseId,
         },
       });
     }
@@ -577,7 +590,7 @@ apiRouter.get("/leads", async (req: Request, res: Response) => {
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
           tenantFilter = { franchiseId: decoded.franchiseId };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     const list = await db.lead.findMany({ where: tenantFilter, orderBy: { date: "desc" } });
     res.json(list);
@@ -596,7 +609,7 @@ apiRouter.post("/leads", async (req: Request, res: Response) => {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
         franchiseId = decoded.franchiseId || null;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const newLead = await db.lead.create({
@@ -677,7 +690,8 @@ apiRouter.put("/leads/:id", async (req: Request, res: Response) => {
             model: "",
             visits: 0,
             totalSpend: 0,
-            lastVisit: new Date().toISOString().slice(0, 10)
+            lastVisit: new Date().toISOString().slice(0, 10),
+            franchiseId: updated.franchiseId,
           }
         });
       }
@@ -1216,7 +1230,25 @@ apiRouter.delete("/franchise/:id", async (req: Request, res: Response) => {
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/customers", async (req: Request, res: Response) => {
   try {
-    const list = await db.customer.findMany({ orderBy: { totalSpend: "desc" } });
+    let tenantFilter = {};
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+          tenantFilter = { franchiseId: decoded.franchiseId };
+        }
+      } catch (e) { }
+    }
+
+    const list = await db.customer.findMany({
+      where: {
+        ...tenantFilter,
+        isDeleted: false,
+      },
+      orderBy: { totalSpend: "desc" },
+    });
     res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1226,6 +1258,16 @@ apiRouter.get("/customers", async (req: Request, res: Response) => {
 apiRouter.post("/customers", async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    let franchiseId: string | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        franchiseId = decoded.franchiseId || null;
+      } catch (e) { }
+    }
+
     const custId = uid("CUST");
     const newCust = await db.customer.create({
       data: {
@@ -1238,6 +1280,7 @@ apiRouter.post("/customers", async (req: Request, res: Response) => {
         visits: 0,
         totalSpend: 0,
         lastVisit: new Date().toISOString().slice(0, 10),
+        franchiseId: franchiseId,
       },
     });
     res.json(newCust);
@@ -1392,7 +1435,7 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
           // If created by HQ, maybe it's not bound by strict limits or they can set franchise
           franchiseId = data.franchiseId || null;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (franchiseId) {
@@ -1405,7 +1448,7 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
       }
     }
 
-    
+
     // Auto-generate username from name if not provided, strip spaces
     const baseUsername = data.username || data.name.replace(/\s+/g, "").toLowerCase();
 
