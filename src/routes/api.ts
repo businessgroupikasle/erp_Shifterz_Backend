@@ -1336,24 +1336,46 @@ apiRouter.put("/settings", async (req: Request, res: Response) => {
     });
 
     if (Array.isArray(technicians)) {
-      // Instead of deleting all and losing passwords, we should ideally upsert.
-      // But to match existing behavior simply, we recreate them with default passwords.
-      await db.employee.deleteMany();
+      // Upsert approach: preserve existing employees (passwords + attendance records).
+      // Create new ones, soft-delete removed ones — never hard-delete (avoids FK constraint on Attendance).
       const defaultPassword = await bcrypt.hash("tech123", 10);
-      for (const t of technicians) {
-        const baseUsername = typeof t === 'string' ? t.replace(/\s+/g, "").toLowerCase() : "tech";
-        await db.employee.create({
-          data: {
-            id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
-            name: t,
-            phone: "",
-            email: "",
-            status: "Active",
-            username: baseUsername,
-            password: defaultPassword,
-          }
-        });
+      const incomingNames: string[] = technicians.filter((t: any) => typeof t === "string");
+
+      // Restore any previously soft-deleted employees that are back in the list
+      await db.employee.updateMany({
+        where: { name: { in: incomingNames }, isDeleted: true },
+        data: { isDeleted: false, deletedAt: null, status: "Active" },
+      });
+
+      // Create employees that don't exist yet
+      const existing = await db.employee.findMany({
+        where: { name: { in: incomingNames } },
+        select: { name: true },
+      });
+      const existingNames = new Set(existing.map((e: any) => e.name));
+
+      for (const t of incomingNames) {
+        if (!existingNames.has(t)) {
+          const baseUsername = t.replace(/\s+/g, "").toLowerCase();
+          await db.employee.create({
+            data: {
+              id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
+              name: t,
+              phone: "",
+              email: "",
+              status: "Active",
+              username: baseUsername,
+              password: defaultPassword,
+            },
+          });
+        }
       }
+
+      // Soft-delete employees that are no longer in the list
+      await db.employee.updateMany({
+        where: { name: { notIn: incomingNames }, isDeleted: false },
+        data: { isDeleted: true, deletedAt: new Date().toISOString() },
+      });
     }
 
     res.json({ success: true });

@@ -231,6 +231,7 @@ model Employee {
   hqControlled Boolean    @default(false)
   franchiseId  String?
   franchise    Franchise? @relation(fields: [franchiseId], references: [id])
+  attendances  Attendance[]
   isDeleted   Boolean    @default(false)
   deletedAt   String?
 }
@@ -238,6 +239,7 @@ model Employee {
 model Attendance {
   id          String     @id @default(cuid())
   employeeId  String
+  employee    Employee   @relation(fields: [employeeId], references: [id])
   date        String
   status      String // Present, Absent, Leave
   clockIn     String?
