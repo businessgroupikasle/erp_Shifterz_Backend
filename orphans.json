@@ -1,0 +1,50 @@
+{
+  "totalAttendances": 5,
+  "totalEmployees": 7,
+  "orphans": [
+    {
+      "id": "cmr68pkuf0000foicc9hnftm8",
+      "employeeId": "EMP001",
+      "date": "2026-07-04",
+      "status": "Present",
+      "clockIn": "08:50",
+      "clockOut": null,
+      "franchiseId": "F001",
+      "isDeleted": false,
+      "deletedAt": null
+    },
+    {
+      "id": "cmr68pkuf0001foic2szbufwh",
+      "employeeId": "EMP002",
+      "date": "2026-07-04",
+      "status": "Present",
+      "clockIn": "08:55",
+      "clockOut": null,
+      "franchiseId": "F001",
+      "isDeleted": false,
+      "deletedAt": null
+    },
+    {
+      "id": "cmr68pkuf0002foicb4poc40d",
+      "employeeId": "EMP003",
+      "date": "2026-07-04",
+      "status": "Absent",
+      "clockIn": null,
+      "clockOut": null,
+      "franchiseId": "F001",
+      "isDeleted": false,
+      "deletedAt": null
+    },
+    {
+      "id": "cmr68pkuf0003foicny3b6x80",
+      "employeeId": "EMP004",
+      "date": "2026-07-04",
+      "status": "Present",
+      "clockIn": "09:05",
+      "clockOut": null,
+      "franchiseId": "F001",
+      "isDeleted": false,
+      "deletedAt": null
+    }
+  ]
+}
