@@ -37,4 +37,4 @@ app.listen(PORT, async () => {
   console.log(`Shifterz backend running on port ${PORT}`);
 });
 
-// Restart trigger
+// Restart trigger - edit and delete transfer request endpoints loaded

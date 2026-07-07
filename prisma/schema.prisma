@@ -276,3 +276,25 @@ model Appointment {
   isDeleted   Boolean    @default(false)
   deletedAt   String?
 }
+
+model MemberTransferRequest {
+  id              String    @id @default(cuid())
+  employeeId      String?
+  fromFranchiseId String?
+  toFranchiseId   String?
+  status          String    @default("Pending") // Pending, Approved, Rejected
+  requestedBy     String
+  date            String
+  newMemberName   String?
+  newMemberPhone  String?
+  newMemberEmail  String?
+  panNumber       String?
+  aadharNumber    String?
+  address         String?
+  panDocUrl       String?
+  aadharDocUrl    String?
+  createdAt       DateTime  @default(now())
+  isDeleted       Boolean   @default(false)
+  deletedAt       String?
+}
+

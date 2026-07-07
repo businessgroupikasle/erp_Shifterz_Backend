@@ -1647,6 +1647,25 @@ apiRouter.get("/employees", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.get("/hq-employees", async (req: Request, res: Response) => {
+  try {
+    const list = await db.employee.findMany({
+      where: {
+        franchiseId: null,
+        isDeleted: false,
+        status: "Active"
+      },
+      orderBy: { name: "asc" }
+    });
+    res.json(list.map(emp => {
+      const { password, ...rest } = emp;
+      return rest;
+    }));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.post("/employees", async (req: Request, res: Response) => {
   try {
     const data = req.body;
@@ -1696,11 +1715,13 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
 
 apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
   try {
+    let requester = "Admin";
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        requester = decoded.username || decoded.role || "Admin";
         
         // Authorization check: Only SUPER_ADMIN and HQ_USER can edit employees
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
@@ -1712,6 +1733,43 @@ apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
 
     const id = String(req.params.id);
     const data = req.body;
+
+    const existing = await db.employee.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: "Employee not found" });
+      return;
+    }
+
+    let transferPending = false;
+    let targetFranchiseId = data.franchiseId;
+
+    // Check if transferring from main branch (franchiseId is null/empty) to a sub-branch (targetFranchiseId is not null/empty)
+    if (!existing.franchiseId && targetFranchiseId && targetFranchiseId !== existing.franchiseId) {
+      // Check if there is already a Pending request for this employee
+      const activeRequest = await db.memberTransferRequest.findFirst({
+        where: {
+          employeeId: id,
+          status: "Pending"
+        }
+      });
+
+      if (!activeRequest) {
+        await db.memberTransferRequest.create({
+          data: {
+            employeeId: id,
+            fromFranchiseId: null,
+            toFranchiseId: targetFranchiseId,
+            requestedBy: requester,
+            date: new Date().toISOString().split("T")[0],
+            status: "Pending"
+          }
+        });
+      }
+      
+      transferPending = true;
+      // Do not assign the franchiseId yet; keep it as null (main branch) until approved
+      data.franchiseId = null;
+    }
     
     let updateData: any = {
       name: data.name,
@@ -1731,7 +1789,7 @@ apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
     });
 
     const { password, ...rest } = updated;
-    res.json(rest);
+    res.json({ ...rest, transferPending });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1883,3 +1941,219 @@ apiRouter.put("/attendance/:id", async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// File Upload Endpoint
+apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MEMBER / BRANCH TRANSFER REQUESTS
+// ═══════════════════════════════════════════════════════════════
+apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
+  try {
+    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl } = req.body;
+    let requester = "Admin";
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        requester = decoded.username || decoded.role || "Admin";
+      } catch (e) {}
+    }
+
+    const request = await db.memberTransferRequest.create({
+      data: {
+        employeeId: employeeId || null,
+        fromFranchiseId: null,
+        toFranchiseId: toFranchiseId || null,
+        newMemberName: newMemberName || null,
+        newMemberPhone: newMemberPhone || null,
+        newMemberEmail: newMemberEmail || null,
+        panNumber: panNumber || null,
+        aadharNumber: aadharNumber || null,
+        address: address || null,
+        panDocUrl: panDocUrl || null,
+        aadharDocUrl: aadharDocUrl || null,
+        requestedBy: requester,
+        date: new Date().toISOString().split("T")[0],
+        status: "Pending"
+      }
+    });
+
+    res.json(request);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get("/member-transfers", async (req: Request, res: Response) => {
+  try {
+    const requests = await db.memberTransferRequest.findMany({
+      where: { isDeleted: false },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const enriched = await Promise.all(requests.map(async (r) => {
+      let empName = r.newMemberName || "Unknown";
+      let empRole = "TECHNICIAN";
+      if (r.employeeId) {
+        const emp = await db.employee.findUnique({
+          where: { id: r.employeeId },
+          select: { name: true, role: true }
+        });
+        if (emp) {
+          empName = emp.name;
+          empRole = emp.role;
+        }
+      }
+      
+      let toFranchise = null;
+      if (r.toFranchiseId) {
+        toFranchise = await db.franchise.findUnique({
+          where: { id: r.toFranchiseId },
+          select: { name: true, city: true }
+        });
+      }
+
+      return {
+        ...r,
+        employeeName: empName,
+        employeeRole: empRole,
+        toFranchiseName: toFranchise?.name || "Unknown",
+        toFranchiseCity: toFranchise?.city || "Unknown"
+      };
+    }));
+
+    res.json(enriched);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const request = await db.memberTransferRequest.findUnique({ where: { id } });
+    if (!request) {
+      res.status(404).json({ error: "Transfer request not found" });
+      return;
+    }
+
+    if (request.status !== "Pending") {
+      res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+      return;
+    }
+
+    if (!request.employeeId) {
+      // Create a new employee on approval
+      const empId = `EMP${Date.now().toString().slice(-6)}`;
+      const username = (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(100 + Math.random() * 900);
+      const defaultPassword = "password123";
+      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+      await db.employee.create({
+        data: {
+          id: empId,
+          name: request.newMemberName || "New Member",
+          phone: request.newMemberPhone || null,
+          email: request.newMemberEmail || null,
+          status: "Active",
+          username,
+          password: hashedPassword,
+          role: "TECHNICIAN",
+          franchiseId: request.toFranchiseId
+        }
+      });
+    } else {
+      // Update Employee branch
+      await db.employee.update({
+        where: { id: request.employeeId },
+        data: { franchiseId: request.toFranchiseId }
+      });
+    }
+
+    // Update Request status
+    const updatedRequest = await db.memberTransferRequest.update({
+      where: { id },
+      data: { status: "Approved" }
+    });
+
+    res.json(updatedRequest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/member-transfers/:id/reject", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const request = await db.memberTransferRequest.findUnique({ where: { id } });
+    if (!request) {
+      res.status(404).json({ error: "Transfer/Recruitment request not found" });
+      return;
+    }
+
+    if (request.status !== "Pending") {
+      res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+      return;
+    }
+
+    // Update Request status
+    const updatedRequest = await db.memberTransferRequest.update({
+      where: { id },
+      data: { status: "Rejected" }
+    });
+
+    res.json(updatedRequest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl } = req.body;
+    const updated = await db.memberTransferRequest.update({
+      where: { id },
+      data: {
+        newMemberName: newMemberName || null,
+        newMemberPhone: newMemberPhone || null,
+        newMemberEmail: newMemberEmail || null,
+        panNumber: panNumber || null,
+        aadharNumber: aadharNumber || null,
+        address: address || null,
+        panDocUrl: panDocUrl || null,
+        aadharDocUrl: aadharDocUrl || null
+      }
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/member-transfers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.memberTransferRequest.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date().toISOString() }
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
