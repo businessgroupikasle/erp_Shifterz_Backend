@@ -1758,9 +1758,9 @@ apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
           data: {
             employeeId: id,
             fromFranchiseId: null,
-            toFranchiseId: targetFranchiseId,
+            toFranchiseId: targetFranchiseId || null,
             requestedBy: requester,
-            date: new Date().toISOString().split("T")[0],
+            date: new Date().toISOString().split("T")[0] || "",
             status: "Pending"
           }
         });
@@ -1888,6 +1888,9 @@ apiRouter.post("/attendance/check-in", async (req: Request, res: Response) => {
         clockIn,
         franchiseId,
       },
+      include: {
+        employee: { select: { id: true, name: true, role: true } }
+      }
     });
 
     res.json(newAttendance);
@@ -1914,6 +1917,9 @@ apiRouter.put("/attendance/check-out", async (req: Request, res: Response) => {
     const updated = await db.attendance.update({
       where: { id: existing.id },
       data: { clockOut },
+      include: {
+        employee: { select: { id: true, name: true, role: true } }
+      }
     });
 
     res.json(updated);
@@ -1961,7 +1967,7 @@ apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response) =
 // ═══════════════════════════════════════════════════════════════
 apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
   try {
-    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl } = req.body;
+    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
     let requester = "Admin";
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -1985,8 +1991,10 @@ apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
         address: address || null,
         panDocUrl: panDocUrl || null,
         aadharDocUrl: aadharDocUrl || null,
+        username: username || null,
+        password: password || null,
         requestedBy: requester,
-        date: new Date().toISOString().split("T")[0],
+        date: new Date().toISOString().split("T")[0] || "",
         status: "Pending"
       }
     });
@@ -2058,9 +2066,9 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
     if (!request.employeeId) {
       // Create a new employee on approval
       const empId = `EMP${Date.now().toString().slice(-6)}`;
-      const username = (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(100 + Math.random() * 900);
-      const defaultPassword = "password123";
-      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+      const username = request.username || (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(100 + Math.random() * 900);
+      const plainPassword = request.password || "password123";
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
       await db.employee.create({
         data: {
@@ -2075,6 +2083,7 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
           franchiseId: request.toFranchiseId
         }
       });
+      console.log(`[APPROVAL] Created employee username: "${username}" with ID ${empId}`);
     } else {
       // Update Employee branch
       await db.employee.update({
@@ -2124,7 +2133,7 @@ apiRouter.post("/member-transfers/:id/reject", async (req: Request, res: Respons
 apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl } = req.body;
+    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
     const updated = await db.memberTransferRequest.update({
       where: { id },
       data: {
@@ -2135,7 +2144,9 @@ apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
         aadharNumber: aadharNumber || null,
         address: address || null,
         panDocUrl: panDocUrl || null,
-        aadharDocUrl: aadharDocUrl || null
+        aadharDocUrl: aadharDocUrl || null,
+        username: username || null,
+        password: password || null
       }
     });
     res.json(updated);

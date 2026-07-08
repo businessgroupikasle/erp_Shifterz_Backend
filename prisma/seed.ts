@@ -192,10 +192,10 @@ async function main() {
   // Attendance
   await prisma.attendance.createMany({
     data: [
-      { employeeId: "EMP001", date: todayStr, status: "Present", clockIn: "08:50", franchiseId: "F001" },
-      { employeeId: "EMP002", date: todayStr, status: "Present", clockIn: "08:55", franchiseId: "F001" },
-      { employeeId: "EMP003", date: todayStr, status: "Absent", franchiseId: "F001" },
-      { employeeId: "EMP004", date: todayStr, status: "Present", clockIn: "09:05", franchiseId: "F001" },
+      { employeeId: "TECH-001", date: todayStr, status: "Present", clockIn: "08:50", franchiseId: "F001" },
+      { employeeId: "TECH-002", date: todayStr, status: "Present", clockIn: "08:55", franchiseId: "F001" },
+      { employeeId: "TECH-003", date: todayStr, status: "Absent", franchiseId: "F001" },
+      { employeeId: "TECH-004", date: todayStr, status: "Present", clockIn: "09:05", franchiseId: "F001" },
     ],
   });
 

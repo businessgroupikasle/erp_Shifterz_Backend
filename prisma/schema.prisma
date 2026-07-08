@@ -293,6 +293,8 @@ model MemberTransferRequest {
   address         String?
   panDocUrl       String?
   aadharDocUrl    String?
+  username        String?
+  password        String?
   createdAt       DateTime  @default(now())
   isDeleted       Boolean   @default(false)
   deletedAt       String?
