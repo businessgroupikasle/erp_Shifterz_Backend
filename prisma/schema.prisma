@@ -283,6 +283,8 @@ model MemberTransferRequest {
   fromFranchiseId String?
   toFranchiseId   String?
   status          String    @default("Pending") // Pending, Approved, Rejected
+  hqApproved      Boolean   @default(false)
+  adminApproved   Boolean   @default(false)
   requestedBy     String
   date            String
   newMemberName   String?
@@ -295,6 +297,7 @@ model MemberTransferRequest {
   aadharDocUrl    String?
   username        String?
   password        String?
+  role            String?   @default("TECHNICIAN")
   createdAt       DateTime  @default(now())
   isDeleted       Boolean   @default(false)
   deletedAt       String?

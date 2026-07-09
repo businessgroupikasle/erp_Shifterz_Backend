@@ -1075,6 +1075,85 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+apiRouter.get("/technician/dashboard", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "No token provided" });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+    
+    // For now we assume decoded has id and role
+    const employeeId = decoded.id;
+    
+    // 1. Get today's attendance
+    const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const attendance = await db.attendance.findFirst({
+      where: {
+        employeeId,
+        date: todayStr,
+        isDeleted: false
+      }
+    });
+
+    // 2. Get jobs for this technician
+    const jobs = await db.job.findMany({
+      where: { 
+        technicianId: employeeId,
+        isDeleted: false
+      }
+    });
+
+    // Compute summaries
+    const totalAssigned = jobs.length;
+    const inProgress = jobs.filter((j: any) => j.status === "In Progress").length;
+    const waitingMaterial = jobs.filter((j: any) => j.status === "Waiting Material").length;
+    const waitingCustomer = jobs.filter((j: any) => j.status === "Waiting Customer").length;
+    const waitingQC = jobs.filter((j: any) => j.status === "Waiting QC").length;
+    const completed = jobs.filter((j: any) => j.status === "Completed").length;
+
+    // Completed today
+    const completedToday = jobs.filter((j: any) => 
+      j.status === "Completed" && 
+      j.actualCompletion && 
+      j.actualCompletion.startsWith(todayStr)
+    ).length;
+
+    // Return aggregated data
+    res.json({
+      attendance: attendance || { status: "Not Checked In", clockIn: null, clockOut: null },
+      jobsSummary: {
+        totalAssigned,
+        inProgress,
+        waitingMaterial,
+        waitingCustomer,
+        waitingQC,
+        completedToday,
+        totalCompleted: completed
+      },
+      // Mock performance metrics as recommended in the plan
+      performance: {
+        jobsCompleted: completed,
+        avgCompletionTime: "4.5 hrs",
+        qcPassRate: "92%",
+        reworkCount: 2
+      },
+      // Mock notifications
+      notifications: [
+        { id: 1, type: "info", text: "New job assigned: TN 04 AB 1234 (PPF Full Body)", time: "10m ago" },
+        { id: 2, type: "warning", text: "Priority changed to URGENT for KL 01 CD 5678", time: "1h ago" },
+        { id: 3, type: "error", text: "QC Failed for TN 99 AA 9999 (Wash)", time: "2h ago" },
+        { id: 4, type: "success", text: "System maintenance completed successfully.", time: "1d ago" }
+      ]
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.post("/jobs", async (req: Request, res: Response) => {
   try {
     const data = req.body;
@@ -1967,7 +2046,7 @@ apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response) =
 // ═══════════════════════════════════════════════════════════════
 apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
   try {
-    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
+    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password, role } = req.body;
     let requester = "Admin";
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -1993,6 +2072,7 @@ apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
         aadharDocUrl: aadharDocUrl || null,
         username: username || null,
         password: password || null,
+        role: role || "TECHNICIAN",
         requestedBy: requester,
         date: new Date().toISOString().split("T")[0] || "",
         status: "Pending"
@@ -2014,7 +2094,7 @@ apiRouter.get("/member-transfers", async (req: Request, res: Response) => {
 
     const enriched = await Promise.all(requests.map(async (r) => {
       let empName = r.newMemberName || "Unknown";
-      let empRole = "TECHNICIAN";
+      let empRole = r.role || "TECHNICIAN";
       if (r.employeeId) {
         const emp = await db.employee.findUnique({
           where: { id: r.employeeId },
@@ -2063,12 +2143,61 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
       return;
     }
 
+    // Determine user role
+    const authHeader = req.headers.authorization;
+    let userRole = "UNKNOWN";
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        userRole = decoded.role;
+      } catch (e) {}
+    }
+
+    let hqApproved = request.hqApproved;
+    let adminApproved = request.adminApproved;
+
+    if (userRole === "HQ_USER") hqApproved = true;
+    if (userRole === "SUPER_ADMIN") adminApproved = true;
+
+    // Check if fully approved
+    const isFullyApproved = hqApproved && adminApproved;
+
+    if (!isFullyApproved) {
+      // Update flags and return without creating employee
+      const updatedRequest = await db.memberTransferRequest.update({
+        where: { id },
+        data: { hqApproved, adminApproved }
+      });
+      res.json(updatedRequest);
+      return;
+    }
+
+    let finalUsername: string | undefined;
+    let finalPassword: string | undefined;
+
     if (!request.employeeId) {
       // Create a new employee on approval
       const empId = `EMP${Date.now().toString().slice(-6)}`;
-      const username = request.username || (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(100 + Math.random() * 900);
-      const plainPassword = request.password || "password123";
-      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      let baseUsername = request.username || (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_");
+      let username = baseUsername;
+      
+      // Ensure username uniqueness
+      const existingUser = await db.employee.findUnique({ where: { username } });
+      if (existingUser) {
+        // Append franchise prefix for clarity instead of random numbers
+        const franchisePrefix = request.toFranchiseId ? request.toFranchiseId.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+        username = franchisePrefix ? `${baseUsername}_${franchisePrefix}` : `${baseUsername}_${Date.now().toString().slice(-4)}`;
+        // Double-check uniqueness
+        const stillExists = await db.employee.findUnique({ where: { username } });
+        if (stillExists) {
+          username = `${baseUsername}_${Date.now().toString().slice(-6)}`;
+        }
+      }
+
+      finalUsername = username;
+      finalPassword = request.password || "password123";
+      const hashedPassword = await bcrypt.hash(finalPassword, 10);
 
       await db.employee.create({
         data: {
@@ -2079,7 +2208,7 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
           status: "Active",
           username,
           password: hashedPassword,
-          role: "TECHNICIAN",
+          role: request.role || "TECHNICIAN",
           franchiseId: request.toFranchiseId
         }
       });
@@ -2092,13 +2221,23 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
       });
     }
 
-    // Update Request status
+    // Update Request status and store final username
+    const updateData: any = { status: "Approved", hqApproved: true, adminApproved: true };
+    if (finalUsername) {
+        updateData.username = finalUsername;
+    }
+
     const updatedRequest = await db.memberTransferRequest.update({
       where: { id },
-      data: { status: "Approved" }
+      data: updateData
     });
 
-    res.json(updatedRequest);
+    // Return the final credentials so the frontend can display them
+    res.json({
+      ...updatedRequest,
+      finalUsername: finalUsername || undefined,
+      finalPassword: finalPassword || undefined
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2133,7 +2272,7 @@ apiRouter.post("/member-transfers/:id/reject", async (req: Request, res: Respons
 apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
+    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password, role } = req.body;
     const updated = await db.memberTransferRequest.update({
       where: { id },
       data: {
@@ -2146,7 +2285,8 @@ apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
         panDocUrl: panDocUrl || null,
         aadharDocUrl: aadharDocUrl || null,
         username: username || null,
-        password: password || null
+        password: password || null,
+        role: role || null
       }
     });
     res.json(updated);

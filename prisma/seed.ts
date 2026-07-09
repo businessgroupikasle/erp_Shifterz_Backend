@@ -26,6 +26,9 @@ async function main() {
   await prisma.job.deleteMany();
   await prisma.outPass.deleteMany();
   await prisma.setting.deleteMany();
+  await prisma.attendance.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.inventoryRequest.deleteMany();
   await prisma.employee.deleteMany();
   // Settings
   await prisma.setting.create({
