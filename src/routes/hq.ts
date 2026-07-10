@@ -85,7 +85,9 @@ hqRouter.post("/franchises", async (req: Request, res: Response): Promise<void> 
 // List all franchises
 hqRouter.get("/franchises", async (req: Request, res: Response): Promise<void> => {
   try {
-    const franchises = await db.franchise.findMany();
+    const franchises = await db.franchise.findMany({
+      where: { isDeleted: false }
+    });
     res.json(franchises);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
