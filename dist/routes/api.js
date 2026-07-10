@@ -278,6 +278,16 @@ apiRouter.get("/carin", async (req, res) => {
 apiRouter.post("/carin", async (req, res) => {
     try {
         const data = req.body;
+        let franchiseId = null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                franchiseId = decoded.franchiseId || null;
+            }
+            catch (e) { }
+        }
         const carId = uid("CAR");
         const jobCardId = await generateSequentialId("JOB");
         const newCar = await db.carIn.create({
@@ -295,6 +305,7 @@ apiRouter.post("/carin", async (req, res) => {
                 odometer: String(data.odometer || "0"),
                 notes: data.notes || "",
                 jobCardId,
+                franchiseId,
             },
         });
         // Automatically create a corresponding Job Card
@@ -311,6 +322,7 @@ apiRouter.post("/carin", async (req, res) => {
                 estCompletion: (data.inTime || new Date().toISOString()).slice(0, 10),
                 actualCompletion: null,
                 notes: "Auto-created from check-in",
+                franchiseId,
             },
         });
         // Upsert customer register
@@ -338,6 +350,7 @@ apiRouter.post("/carin", async (req, res) => {
                     visits: 1,
                     totalSpend: 0,
                     lastVisit: new Date().toISOString().slice(0, 10),
+                    franchiseId,
                 },
             });
         }
@@ -626,7 +639,8 @@ apiRouter.put("/leads/:id", async (req, res) => {
                         model: "",
                         visits: 0,
                         totalSpend: 0,
-                        lastVisit: new Date().toISOString().slice(0, 10)
+                        lastVisit: new Date().toISOString().slice(0, 10),
+                        franchiseId: updated.franchiseId,
                     }
                 });
             }
@@ -984,7 +998,7 @@ apiRouter.get("/jobs", async (req, res) => {
         }
         const list = await db.job.findMany({
             where: filter,
-            orderBy: { id: "desc" }
+            orderBy: { createdAt: "desc" }
         });
         // Debug info
         console.log(`[Jobs API] User Role: ${userInfo.role}, TechnicianId: ${userInfo.technicianId}, Filter: ${JSON.stringify(filter)}, Results: ${list.length}`);
@@ -1148,7 +1162,25 @@ apiRouter.delete("/franchise/:id", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/customers", async (req, res) => {
     try {
-        const list = await db.customer.findMany({ orderBy: { totalSpend: "desc" } });
+        let tenantFilter = {};
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+                    tenantFilter = { franchiseId: decoded.franchiseId };
+                }
+            }
+            catch (e) { }
+        }
+        const list = await db.customer.findMany({
+            where: {
+                ...tenantFilter,
+                isDeleted: false,
+            },
+            orderBy: { totalSpend: "desc" },
+        });
         res.json(list);
     }
     catch (error) {
@@ -1158,6 +1190,16 @@ apiRouter.get("/customers", async (req, res) => {
 apiRouter.post("/customers", async (req, res) => {
     try {
         const data = req.body;
+        let franchiseId = null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                franchiseId = decoded.franchiseId || null;
+            }
+            catch (e) { }
+        }
         const custId = uid("CUST");
         const newCust = await db.customer.create({
             data: {
@@ -1170,6 +1212,7 @@ apiRouter.post("/customers", async (req, res) => {
                 visits: 0,
                 totalSpend: 0,
                 lastVisit: new Date().toISOString().slice(0, 10),
+                franchiseId: franchiseId,
             },
         });
         res.json(newCust);
@@ -1265,24 +1308,42 @@ apiRouter.put("/settings", async (req, res) => {
             },
         });
         if (Array.isArray(technicians)) {
-            // Instead of deleting all and losing passwords, we should ideally upsert.
-            // But to match existing behavior simply, we recreate them with default passwords.
-            await db.employee.deleteMany();
+            // Upsert approach: preserve existing employees (passwords + attendance records).
+            // Create new ones, soft-delete removed ones — never hard-delete (avoids FK constraint on Attendance).
             const defaultPassword = await bcrypt.hash("tech123", 10);
-            for (const t of technicians) {
-                const baseUsername = typeof t === 'string' ? t.replace(/\s+/g, "").toLowerCase() : "tech";
-                await db.employee.create({
-                    data: {
-                        id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
-                        name: t,
-                        phone: "",
-                        email: "",
-                        status: "Active",
-                        username: baseUsername,
-                        password: defaultPassword,
-                    }
-                });
+            const incomingNames = technicians.filter((t) => typeof t === "string");
+            // Restore any previously soft-deleted employees that are back in the list
+            await db.employee.updateMany({
+                where: { name: { in: incomingNames }, isDeleted: true },
+                data: { isDeleted: false, deletedAt: null, status: "Active" },
+            });
+            // Create employees that don't exist yet
+            const existing = await db.employee.findMany({
+                where: { name: { in: incomingNames } },
+                select: { name: true },
+            });
+            const existingNames = new Set(existing.map((e) => e.name));
+            for (const t of incomingNames) {
+                if (!existingNames.has(t)) {
+                    const baseUsername = t.replace(/\s+/g, "").toLowerCase();
+                    await db.employee.create({
+                        data: {
+                            id: `TECH_${Math.random().toString(36).substr(2, 9)}`,
+                            name: t,
+                            phone: "",
+                            email: "",
+                            status: "Active",
+                            username: baseUsername,
+                            password: defaultPassword,
+                        },
+                    });
+                }
             }
+            // Soft-delete employees that are no longer in the list
+            await db.employee.updateMany({
+                where: { name: { notIn: incomingNames }, isDeleted: false },
+                data: { isDeleted: true, deletedAt: new Date().toISOString() },
+            });
         }
         res.json({ success: true });
     }
@@ -1467,6 +1528,522 @@ apiRouter.get("/reports", async (req, res) => {
             leadConversion,
             franchiseRevenue,
         });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// ═══════════════════════════════════════════════════════════════
+// EMPLOYEES
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/employees", async (req, res) => {
+    try {
+        let tenantFilter = { isDeleted: false };
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+                    tenantFilter.franchiseId = decoded.franchiseId;
+                }
+            }
+            catch (e) { }
+        }
+        const list = await db.employee.findMany({
+            where: tenantFilter,
+            orderBy: { id: "asc" },
+            include: { franchise: { select: { id: true, name: true, city: true } } }
+        });
+        res.json(list.map(emp => {
+            const { password, ...rest } = emp;
+            return rest;
+        }));
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.get("/hq-employees", async (req, res) => {
+    try {
+        const list = await db.employee.findMany({
+            where: {
+                franchiseId: null,
+                isDeleted: false,
+                status: "Active"
+            },
+            orderBy: { name: "asc" }
+        });
+        res.json(list.map(emp => {
+            const { password, ...rest } = emp;
+            return rest;
+        }));
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.post("/employees", async (req, res) => {
+    try {
+        const data = req.body;
+        let franchiseId = data.franchiseId || null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                // Authorization check: Only SUPER_ADMIN and HQ_USER can create employees
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+                    res.status(403).json({ error: "Unauthorized: Only HQ can create employees" });
+                    return;
+                }
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+                    franchiseId = decoded.franchiseId;
+                }
+            }
+            catch (e) { }
+        }
+        const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
+        const empId = `EMP${Date.now().toString().slice(-6)}`;
+        const newEmployee = await db.employee.create({
+            data: {
+                id: empId,
+                name: data.name,
+                phone: data.phone || null,
+                email: data.email || null,
+                status: data.status || "Active",
+                username: data.username || null,
+                password: hashedPassword,
+                role: data.role || "TECHNICIAN",
+                franchiseId: franchiseId,
+            },
+        });
+        const { password, ...rest } = newEmployee;
+        res.json(rest);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.put("/employees/:id", async (req, res) => {
+    try {
+        let requester = "Admin";
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                requester = decoded.username || decoded.role || "Admin";
+                // Authorization check: Only SUPER_ADMIN and HQ_USER can edit employees
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+                    res.status(403).json({ error: "Unauthorized: Only HQ can edit employees" });
+                    return;
+                }
+            }
+            catch (e) { }
+        }
+        const id = String(req.params.id);
+        const data = req.body;
+        const existing = await db.employee.findUnique({ where: { id } });
+        if (!existing) {
+            res.status(404).json({ error: "Employee not found" });
+            return;
+        }
+        let transferPending = false;
+        let targetFranchiseId = data.franchiseId;
+        // Check if transferring from main branch (franchiseId is null/empty) to a sub-branch (targetFranchiseId is not null/empty)
+        if (!existing.franchiseId && targetFranchiseId && targetFranchiseId !== existing.franchiseId) {
+            // Check if there is already a Pending request for this employee
+            const activeRequest = await db.memberTransferRequest.findFirst({
+                where: {
+                    employeeId: id,
+                    status: "Pending"
+                }
+            });
+            if (!activeRequest) {
+                await db.memberTransferRequest.create({
+                    data: {
+                        employeeId: id,
+                        fromFranchiseId: null,
+                        toFranchiseId: targetFranchiseId || null,
+                        requestedBy: requester,
+                        date: new Date().toISOString().split("T")[0] || "",
+                        status: "Pending"
+                    }
+                });
+            }
+            transferPending = true;
+            // Do not assign the franchiseId yet; keep it as null (main branch) until approved
+            data.franchiseId = null;
+        }
+        let updateData = {
+            name: data.name,
+            phone: data.phone,
+            email: data.email,
+            status: data.status,
+            role: data.role,
+            franchiseId: data.franchiseId,
+        };
+        if (data.username)
+            updateData.username = data.username;
+        if (data.password)
+            updateData.password = await bcrypt.hash(data.password, 10);
+        const updated = await db.employee.update({
+            where: { id },
+            data: updateData,
+        });
+        const { password, ...rest } = updated;
+        res.json({ ...rest, transferPending });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.delete("/employees/:id", async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                // Authorization check: Only SUPER_ADMIN and HQ_USER can delete employees
+                if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
+                    res.status(403).json({ error: "Unauthorized: Only HQ can delete employees" });
+                    return;
+                }
+            }
+            catch (e) { }
+        }
+        const id = String(req.params.id);
+        await db.employee.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date().toISOString() } });
+        res.json({ success: true, message: "Employee deleted" });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// ═══════════════════════════════════════════════════════════════
+// ATTENDANCE
+// ═══════════════════════════════════════════════════════════════
+apiRouter.get("/attendance", async (req, res) => {
+    try {
+        let tenantFilter = { isDeleted: false };
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                if (decoded.role === "SUPER_ADMIN" || decoded.role === "HQ_USER") {
+                    // HQ sees all
+                }
+                else if (decoded.role === "FRANCHISE_ADMIN" || decoded.role === "BRANCH_MANAGER") {
+                    // Franchise Admin sees their franchise
+                    tenantFilter.franchiseId = decoded.franchiseId;
+                }
+                else {
+                    // Normal employees see only their own attendance
+                    tenantFilter.employeeId = decoded.id;
+                }
+            }
+            catch (e) { }
+        }
+        const list = await db.attendance.findMany({
+            where: tenantFilter,
+            orderBy: { date: "desc" },
+            include: {
+                franchise: { select: { id: true, name: true, city: true } },
+                employee: { select: { id: true, name: true, role: true } }
+            }
+        });
+        res.json(list);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.post("/attendance/check-in", async (req, res) => {
+    try {
+        const { employeeId } = req.body;
+        let franchiseId = null;
+        const emp = await db.employee.findUnique({ where: { id: employeeId } });
+        if (!emp) {
+            res.status(404).json({ error: "Employee not found" });
+            return;
+        }
+        franchiseId = emp.franchiseId;
+        const date = new Date().toISOString().slice(0, 10);
+        const clockIn = new Date().toISOString();
+        const existing = await db.attendance.findFirst({
+            where: { employeeId, date, isDeleted: false }
+        });
+        if (existing) {
+            res.status(400).json({ error: "Already checked in for today" });
+            return;
+        }
+        const newAttendance = await db.attendance.create({
+            data: {
+                employeeId,
+                date,
+                status: "Present",
+                clockIn,
+                franchiseId,
+            },
+            include: {
+                employee: { select: { id: true, name: true, role: true } }
+            }
+        });
+        res.json(newAttendance);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.put("/attendance/check-out", async (req, res) => {
+    try {
+        const { employeeId } = req.body;
+        const date = new Date().toISOString().slice(0, 10);
+        const clockOut = new Date().toISOString();
+        const existing = await db.attendance.findFirst({
+            where: { employeeId, date, isDeleted: false, clockOut: null }
+        });
+        if (!existing) {
+            res.status(400).json({ error: "No active check-in found for today" });
+            return;
+        }
+        const updated = await db.attendance.update({
+            where: { id: existing.id },
+            data: { clockOut },
+            include: {
+                employee: { select: { id: true, name: true, role: true } }
+            }
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.put("/attendance/:id", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const data = req.body;
+        const updated = await db.attendance.update({
+            where: { id },
+            data: {
+                status: data.status,
+                clockIn: data.clockIn,
+                clockOut: data.clockOut,
+            },
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// File Upload Endpoint
+apiRouter.post("/upload", upload.single("file"), (req, res) => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ error: "No file uploaded" });
+            return;
+        }
+        const fileUrl = `/uploads/${req.file.filename}`;
+        res.json({ url: fileUrl });
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// ═══════════════════════════════════════════════════════════════
+// MEMBER / BRANCH TRANSFER REQUESTS
+// ═══════════════════════════════════════════════════════════════
+apiRouter.post("/member-transfers", async (req, res) => {
+    try {
+        const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
+        let requester = "Admin";
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+                requester = decoded.username || decoded.role || "Admin";
+            }
+            catch (e) { }
+        }
+        const request = await db.memberTransferRequest.create({
+            data: {
+                employeeId: employeeId || null,
+                fromFranchiseId: null,
+                toFranchiseId: toFranchiseId || null,
+                newMemberName: newMemberName || null,
+                newMemberPhone: newMemberPhone || null,
+                newMemberEmail: newMemberEmail || null,
+                panNumber: panNumber || null,
+                aadharNumber: aadharNumber || null,
+                address: address || null,
+                panDocUrl: panDocUrl || null,
+                aadharDocUrl: aadharDocUrl || null,
+                username: username || null,
+                password: password || null,
+                requestedBy: requester,
+                date: new Date().toISOString().split("T")[0] || "",
+                status: "Pending"
+            }
+        });
+        res.json(request);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.get("/member-transfers", async (req, res) => {
+    try {
+        const requests = await db.memberTransferRequest.findMany({
+            where: { isDeleted: false },
+            orderBy: { createdAt: "desc" }
+        });
+        const enriched = await Promise.all(requests.map(async (r) => {
+            let empName = r.newMemberName || "Unknown";
+            let empRole = "TECHNICIAN";
+            if (r.employeeId) {
+                const emp = await db.employee.findUnique({
+                    where: { id: r.employeeId },
+                    select: { name: true, role: true }
+                });
+                if (emp) {
+                    empName = emp.name;
+                    empRole = emp.role;
+                }
+            }
+            let toFranchise = null;
+            if (r.toFranchiseId) {
+                toFranchise = await db.franchise.findUnique({
+                    where: { id: r.toFranchiseId },
+                    select: { name: true, city: true }
+                });
+            }
+            return {
+                ...r,
+                employeeName: empName,
+                employeeRole: empRole,
+                toFranchiseName: toFranchise?.name || "Unknown",
+                toFranchiseCity: toFranchise?.city || "Unknown"
+            };
+        }));
+        res.json(enriched);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.post("/member-transfers/:id/approve", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const request = await db.memberTransferRequest.findUnique({ where: { id } });
+        if (!request) {
+            res.status(404).json({ error: "Transfer request not found" });
+            return;
+        }
+        if (request.status !== "Pending") {
+            res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+            return;
+        }
+        if (!request.employeeId) {
+            // Create a new employee on approval
+            const empId = `EMP${Date.now().toString().slice(-6)}`;
+            const username = request.username || (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_") + "_" + Math.floor(100 + Math.random() * 900);
+            const plainPassword = request.password || "password123";
+            const hashedPassword = await bcrypt.hash(plainPassword, 10);
+            await db.employee.create({
+                data: {
+                    id: empId,
+                    name: request.newMemberName || "New Member",
+                    phone: request.newMemberPhone || null,
+                    email: request.newMemberEmail || null,
+                    status: "Active",
+                    username,
+                    password: hashedPassword,
+                    role: "TECHNICIAN",
+                    franchiseId: request.toFranchiseId
+                }
+            });
+            console.log(`[APPROVAL] Created employee username: "${username}" with ID ${empId}`);
+        }
+        else {
+            // Update Employee branch
+            await db.employee.update({
+                where: { id: request.employeeId },
+                data: { franchiseId: request.toFranchiseId }
+            });
+        }
+        // Update Request status
+        const updatedRequest = await db.memberTransferRequest.update({
+            where: { id },
+            data: { status: "Approved" }
+        });
+        res.json(updatedRequest);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.post("/member-transfers/:id/reject", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const request = await db.memberTransferRequest.findUnique({ where: { id } });
+        if (!request) {
+            res.status(404).json({ error: "Transfer/Recruitment request not found" });
+            return;
+        }
+        if (request.status !== "Pending") {
+            res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+            return;
+        }
+        // Update Request status
+        const updatedRequest = await db.memberTransferRequest.update({
+            where: { id },
+            data: { status: "Rejected" }
+        });
+        res.json(updatedRequest);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.put("/member-transfers/:id", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password } = req.body;
+        const updated = await db.memberTransferRequest.update({
+            where: { id },
+            data: {
+                newMemberName: newMemberName || null,
+                newMemberPhone: newMemberPhone || null,
+                newMemberEmail: newMemberEmail || null,
+                panNumber: panNumber || null,
+                aadharNumber: aadharNumber || null,
+                address: address || null,
+                panDocUrl: panDocUrl || null,
+                aadharDocUrl: aadharDocUrl || null,
+                username: username || null,
+                password: password || null
+            }
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+apiRouter.delete("/member-transfers/:id", async (req, res) => {
+    try {
+        const id = String(req.params.id);
+        await db.memberTransferRequest.update({
+            where: { id },
+            data: { isDeleted: true, deletedAt: new Date().toISOString() }
+        });
+        res.json({ success: true });
     }
     catch (error) {
         res.status(500).json({ error: error.message });

@@ -31,6 +31,7 @@ async function main() {
   await prisma.customer.deleteMany();
   await prisma.franchise.deleteMany();
   await prisma.setting.deleteMany();
+<<<<<<< HEAD
   await prisma.rolePermission.deleteMany();
 
   // Role Permissions Seed Matrix
@@ -53,6 +54,12 @@ async function main() {
       permissions,
     })),
   });
+=======
+  await prisma.attendance.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.inventoryRequest.deleteMany();
+  await prisma.employee.deleteMany();
+>>>>>>> e62036fa4ccf79f3cb6b110480b2d243deaf979f
   // Settings
   await prisma.setting.create({
     data: {

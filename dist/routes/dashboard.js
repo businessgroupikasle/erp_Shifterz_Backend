@@ -14,9 +14,17 @@ dashboardRouter.get("/", async (req, res) => {
         const monthStr = todayStr.substring(0, 7); // YYYY-MM
         // 1. CRM Metrics
         const leadsToday = await db.lead.count({ where: { ...tenantFilter, date: { startsWith: todayStr } } });
-        const customers = await db.customer.findMany({ where: tenantFilter });
-        const newCustomers = customers.filter(c => c.visits === 1).length;
+        const customers = await db.customer.findMany({
+            where: {
+                ...tenantFilter,
+                isDeleted: false
+            }
+        });
+        const newCustomers = customers.filter(c => c.visits <= 1).length;
         const returningCustomers = customers.filter(c => c.visits > 1).length;
+        // Sort by ID descending to put the most recently created customers first
+        const sortedCustomers = [...customers].sort((a, b) => b.id.localeCompare(a.id));
+        const newCustomersList = sortedCustomers.filter(c => c.visits <= 1).slice(0, 5);
         const appointmentsToday = await db.appointment.count({
             where: { ...tenantFilter, scheduledDate: { startsWith: todayStr } }
         });
@@ -61,7 +69,8 @@ dashboardRouter.get("/", async (req, res) => {
                 appointmentsToday,
                 leadsToday,
                 newCustomers,
-                returningCustomers
+                returningCustomers,
+                newCustomersList
             },
             workshop: {
                 carsReceivedToday,

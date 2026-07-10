@@ -1,0 +1,12 @@
+SUCCESS:
+Datasource "db": PostgreSQL database "shifterz", schema "public" at "localhost:5433"
+
+Your database is now in sync with your Prisma schema. Done in 337ms
+
+
+
+✔ Generated Prisma Client (v7.8.0) to .\node_modules\@prisma\client in 368ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+

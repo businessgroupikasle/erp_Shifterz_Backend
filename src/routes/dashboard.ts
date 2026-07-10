@@ -11,7 +11,7 @@ dashboardRouter.use(tenantScope);
 dashboardRouter.get("/", async (req: Request, res: Response) => {
   try {
     const tenantFilter = (req as any).tenantFilter || {};
-    
+
     const today = new Date();
     // Since dates in DB are seeded as YYYY-MM-DD
     const todayStr = today.toISOString().split("T")[0] as string;
@@ -19,10 +19,19 @@ dashboardRouter.get("/", async (req: Request, res: Response) => {
 
     // 1. CRM Metrics
     const leadsToday = await db.lead.count({ where: { ...tenantFilter, date: { startsWith: todayStr } } });
-    
-    const customers = await db.customer.findMany({ where: tenantFilter });
-    const newCustomers = customers.filter(c => c.visits === 1).length;
+
+    const customers = await db.customer.findMany({
+      where: {
+        ...tenantFilter,
+        isDeleted: false
+      }
+    });
+    const newCustomers = customers.filter(c => c.visits <= 1).length;
     const returningCustomers = customers.filter(c => c.visits > 1).length;
+
+    // Sort by ID descending to put the most recently created customers first
+    const sortedCustomers = [...customers].sort((a, b) => b.id.localeCompare(a.id));
+    const newCustomersList = sortedCustomers.filter(c => c.visits <= 1).slice(0, 5);
 
     const appointmentsToday = await db.appointment.count({
       where: { ...tenantFilter, scheduledDate: { startsWith: todayStr } }
@@ -40,11 +49,11 @@ dashboardRouter.get("/", async (req: Request, res: Response) => {
 
     // 3. Financial Metrics
     const invoices = await db.invoice.findMany({ where: tenantFilter });
-    
+
     const revenueToday = invoices
       .filter(i => i.status === "Paid" && i.date.startsWith(todayStr))
       .reduce((sum, i) => sum + (i.amount + i.gst - i.discount), 0);
-      
+
     const revenueThisMonth = invoices
       .filter(i => i.status === "Paid" && i.date.startsWith(monthStr))
       .reduce((sum, i) => sum + (i.amount + i.gst - i.discount), 0);
@@ -80,7 +89,8 @@ dashboardRouter.get("/", async (req: Request, res: Response) => {
         appointmentsToday,
         leadsToday,
         newCustomers,
-        returningCustomers
+        returningCustomers,
+        newCustomersList
       },
       workshop: {
         carsReceivedToday,

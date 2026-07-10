@@ -11,7 +11,7 @@ import { dashboardRouter } from "./routes/dashboard.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
+// Load environment variables (updated to 127.0.0.1 for local postgres connectivity)
 dotenv.config();
 
 const app = express();
@@ -37,7 +37,7 @@ import { exec } from "child_process";
 // Start Server
 app.listen(PORT, async () => {
   console.log(`Shifterz backend running on port ${PORT}`);
-  
+
   // Automigrate & regenerate Prisma client on startup
   console.log("[Auto-Migration] Running npx prisma db push...");
   exec("npx prisma db push", (err, stdout, stderr) => {
@@ -49,4 +49,4 @@ app.listen(PORT, async () => {
   });
 });
 
-// Restart trigger: prisma schema model updated to UserPermission relations table v2
+// Restart trigger

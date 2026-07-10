@@ -13,6 +13,15 @@ hqRouter.use(requireRole(["SUPER_ADMIN", "HQ_USER"]));
 hqRouter.post("/franchises", async (req, res) => {
     try {
         const { name, city, owner, phone, since, royaltyPct, status, adminUsername, adminPassword, businessName, gstNumber, email, address, state, pinCode, licenseStatus } = req.body;
+        if (adminUsername) {
+            const existing = await db.employee.findFirst({
+                where: { username: adminUsername }
+            });
+            if (existing) {
+                res.status(400).json({ error: "Username is already taken by another employee/admin" });
+                return;
+            }
+        }
         // Generate a unique ID (e.g. FRA001)
         const count = await db.franchise.count();
         const id = `FRA${String(count + 1).padStart(3, "0")}`;

@@ -8,7 +8,7 @@ import { hqRouter } from "./routes/hq.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Load environment variables
+// Load environment variables (updated to 127.0.0.1 for local postgres connectivity)
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,5 +28,5 @@ app.get("/health", (req, res) => {
 app.listen(PORT, async () => {
     console.log(`Shifterz backend running on port ${PORT}`);
 });
-// Restart trigger
+// Restart trigger - edit and delete transfer request endpoints loaded
 //# sourceMappingURL=index.js.map

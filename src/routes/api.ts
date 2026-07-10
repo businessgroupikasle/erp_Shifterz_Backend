@@ -33,27 +33,27 @@ const idCounters: Record<string, number> = {
 // Helper to generate sequential IDs
 const generateSequentialId = async (prefix: string): Promise<string> => {
   if (idCounters[prefix] === 0) {
-     let maxId = 0;
-     let model: any = null;
-     if (prefix === "CUS") model = db.customer;
-     else if (prefix === "INV" || prefix === "QT" || prefix === "EST") model = db.invoice;
-     else if (prefix === "L") model = db.lead;
-     else if (prefix === "JOB") model = db.job;
+    let maxId = 0;
+    let model: any = null;
+    if (prefix === "CUS") model = db.customer;
+    else if (prefix === "INV" || prefix === "QT" || prefix === "EST") model = db.invoice;
+    else if (prefix === "L") model = db.lead;
+    else if (prefix === "JOB") model = db.job;
 
-     if (model) {
-       const allRecords = await model.findMany({
-         where: { id: { startsWith: prefix } },
-         select: { id: true }
-       });
-       for (const record of allRecords) {
-         const numStr = record.id.replace(prefix, "");
-         const num = parseInt(numStr, 10);
-         if (!isNaN(num) && num > maxId) {
-           maxId = num;
-         }
-       }
-     }
-     idCounters[prefix] = maxId;
+    if (model) {
+      const allRecords = await model.findMany({
+        where: { id: { startsWith: prefix } },
+        select: { id: true }
+      });
+      for (const record of allRecords) {
+        const numStr = record.id.replace(prefix, "");
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxId) {
+          maxId = num;
+        }
+      }
+    }
+    idCounters[prefix] = maxId;
   }
   idCounters[prefix] = (idCounters[prefix] || 0) + 1;
   return `${prefix}${String(idCounters[prefix]).padStart(3, "0")}`;
@@ -92,12 +92,11 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
     }
 
     const baseRole = user.role.split("|")[0];
-    const resolvedPermissions = await resolveUserPermissions(user.id, user.role);
-    const tokenPayload = { 
-      id: user.id, 
-      username: user.username, 
-      role: user.role, 
-      permissions: resolvedPermissions,
+
+    const tokenPayload = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
       franchiseId: user.franchiseId,
       ...(baseRole === "TECHNICIAN" || baseRole === "QUALITY_INSPECTOR" ? { technicianId: user.id } : {})
     };
@@ -218,7 +217,7 @@ apiRouter.get("/dashboard-legacy", async (req: Request, res: Response): Promise<
 
     const activeLeadsCount = leads.filter(l => l.status === "New" || l.status === "Follow Up").length;
     const carsInWorkshop = cars.filter(c => c.status === "In Workshop");
-    
+
     // Revenue calculations: paid invoices
     const totalRev = invoices
       .filter(i => i.status === "Paid")
@@ -356,6 +355,16 @@ apiRouter.get("/carin", async (req: Request, res: Response) => {
 apiRouter.post("/carin", async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    let franchiseId: string | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        franchiseId = decoded.franchiseId || null;
+      } catch (e) { }
+    }
+
     const carId = uid("CAR");
     const jobCardId = await generateSequentialId("JOB");
 
@@ -374,6 +383,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
         odometer: String(data.odometer || "0"),
         notes: data.notes || "",
         jobCardId,
+        franchiseId,
       },
     });
 
@@ -391,6 +401,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
         estCompletion: (data.inTime || new Date().toISOString()).slice(0, 10),
         actualCompletion: null,
         notes: "Auto-created from check-in",
+        franchiseId,
       },
     });
 
@@ -418,6 +429,7 @@ apiRouter.post("/carin", async (req: Request, res: Response) => {
           visits: 1,
           totalSpend: 0,
           lastVisit: new Date().toISOString().slice(0, 10),
+          franchiseId,
         },
       });
     }
@@ -530,7 +542,7 @@ apiRouter.put("/carin/:id/checkout", async (req: Request, res: Response) => {
 apiRouter.delete("/carin/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    
+
     // Delete any associated OutPass first due to logical relation (though no strict database constraint, it keeps data clean)
     await db.outPass.deleteMany({ where: { carInId: id } });
 
@@ -620,7 +632,7 @@ apiRouter.get("/leads", async (req: Request, res: Response) => {
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
           tenantFilter = { franchiseId: decoded.franchiseId };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     const list = await db.lead.findMany({ where: tenantFilter, orderBy: { date: "desc" } });
     res.json(list);
@@ -639,7 +651,7 @@ apiRouter.post("/leads", async (req: Request, res: Response) => {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
         franchiseId = decoded.franchiseId || null;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const newLead = await db.lead.create({
@@ -720,7 +732,8 @@ apiRouter.put("/leads/:id", async (req: Request, res: Response) => {
             model: "",
             visits: 0,
             totalSpend: 0,
-            lastVisit: new Date().toISOString().slice(0, 10)
+            lastVisit: new Date().toISOString().slice(0, 10),
+            franchiseId: updated.franchiseId,
           }
         });
       }
@@ -754,9 +767,9 @@ apiRouter.delete("/leads/:id", async (req: Request, res: Response) => {
 apiRouter.get("/invoices", async (req: Request, res: Response) => {
   try {
     const list = await db.invoice.findMany({ orderBy: { date: "desc" } });
-    
+
     const payments = await db.payment.findMany();
-    
+
     const listWithPaidAmount = list.map(inv => {
       const invPayments = payments.filter(p => p.invoiceId === inv.id);
       const paidAmount = invPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -866,7 +879,7 @@ apiRouter.get("/payments", async (req: Request, res: Response) => {
 apiRouter.post("/payments", async (req: Request, res: Response): Promise<void> => {
   try {
     const data = req.body;
-    
+
     // Find invoice
     const invoice = await db.invoice.findUnique({
       where: { id: data.invoiceId },
@@ -1092,7 +1105,7 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
 
     const list = await db.job.findMany({
       where: filter,
-      orderBy: { id: "desc" }
+      orderBy: { createdAt: "desc" }
     });
 
     // Debug info
@@ -1104,11 +1117,90 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+apiRouter.get("/technician/dashboard", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "No token provided" });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+
+    // For now we assume decoded has id and role
+    const employeeId = decoded.id;
+
+    // 1. Get today's attendance
+    const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const attendance = await db.attendance.findFirst({
+      where: {
+        employeeId,
+        date: todayStr,
+        isDeleted: false
+      }
+    });
+
+    // 2. Get jobs for this technician
+    const jobs = await db.job.findMany({
+      where: {
+        technicianId: employeeId,
+        isDeleted: false
+      }
+    });
+
+    // Compute summaries
+    const totalAssigned = jobs.length;
+    const inProgress = jobs.filter((j: any) => j.status === "In Progress").length;
+    const waitingMaterial = jobs.filter((j: any) => j.status === "Waiting Material").length;
+    const waitingCustomer = jobs.filter((j: any) => j.status === "Waiting Customer").length;
+    const waitingQC = jobs.filter((j: any) => j.status === "Waiting QC").length;
+    const completed = jobs.filter((j: any) => j.status === "Completed").length;
+
+    // Completed today
+    const completedToday = jobs.filter((j: any) =>
+      j.status === "Completed" &&
+      j.actualCompletion &&
+      j.actualCompletion.startsWith(todayStr)
+    ).length;
+
+    // Return aggregated data
+    res.json({
+      attendance: attendance || { status: "Not Checked In", clockIn: null, clockOut: null },
+      jobsSummary: {
+        totalAssigned,
+        inProgress,
+        waitingMaterial,
+        waitingCustomer,
+        waitingQC,
+        completedToday,
+        totalCompleted: completed
+      },
+      // Mock performance metrics as recommended in the plan
+      performance: {
+        jobsCompleted: completed,
+        avgCompletionTime: "4.5 hrs",
+        qcPassRate: "92%",
+        reworkCount: 2
+      },
+      // Mock notifications
+      notifications: [
+        { id: 1, type: "info", text: "New job assigned: TN 04 AB 1234 (PPF Full Body)", time: "10m ago" },
+        { id: 2, type: "warning", text: "Priority changed to URGENT for KL 01 CD 5678", time: "1h ago" },
+        { id: 3, type: "error", text: "QC Failed for TN 99 AA 9999 (Wash)", time: "2h ago" },
+        { id: 4, type: "success", text: "System maintenance completed successfully.", time: "1d ago" }
+      ]
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.post("/jobs", async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const jobId = await generateSequentialId("JOB");
-    
+
     // Lookup technicianId if not provided
     let techId = data.technicianId || null;
     if (!techId && data.technician) {
@@ -1259,7 +1351,25 @@ apiRouter.delete("/franchise/:id", async (req: Request, res: Response) => {
 // ═══════════════════════════════════════════════════════════════
 apiRouter.get("/customers", async (req: Request, res: Response) => {
   try {
-    const list = await db.customer.findMany({ orderBy: { totalSpend: "desc" } });
+    let tenantFilter = {};
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
+          tenantFilter = { franchiseId: decoded.franchiseId };
+        }
+      } catch (e) { }
+    }
+
+    const list = await db.customer.findMany({
+      where: {
+        ...tenantFilter,
+        isDeleted: false,
+      },
+      orderBy: { totalSpend: "desc" },
+    });
     res.json(list);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1269,6 +1379,16 @@ apiRouter.get("/customers", async (req: Request, res: Response) => {
 apiRouter.post("/customers", async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    let franchiseId: string | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        franchiseId = decoded.franchiseId || null;
+      } catch (e) { }
+    }
+
     const custId = uid("CUST");
     const newCust = await db.customer.create({
       data: {
@@ -1281,6 +1401,7 @@ apiRouter.post("/customers", async (req: Request, res: Response) => {
         visits: 0,
         totalSpend: 0,
         lastVisit: new Date().toISOString().slice(0, 10),
+        franchiseId: franchiseId,
       },
     });
     res.json(newCust);
@@ -1348,7 +1469,7 @@ apiRouter.get("/settings", async (req: Request, res: Response) => {
 apiRouter.put("/settings", async (req: Request, res: Response) => {
   try {
     const { companyInfo, technicians, salesAgents, categories, securityGuards } = req.body;
-    
+
     const settings = await db.setting.upsert({
       where: { id: "default" },
       update: {
@@ -1457,7 +1578,7 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
           // If created by HQ, maybe it's not bound by strict limits or they can set franchise
           franchiseId = data.franchiseId || null;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (franchiseId) {
@@ -1470,10 +1591,10 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
       }
     }
 
-    
+
     // Auto-generate username from name if not provided, strip spaces
     const baseUsername = data.username || data.name.replace(/\s+/g, "").toLowerCase();
-    
+
     // Hash default password if provided, else "tech123"
     const rawPassword = data.password || "tech123";
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
@@ -1639,12 +1760,12 @@ apiRouter.get("/employees", async (req: Request, res: Response) => {
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
           tenantFilter.franchiseId = decoded.franchiseId;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
-    const list = await db.employee.findMany({ 
-      where: tenantFilter, 
+    const list = await db.employee.findMany({
+      where: tenantFilter,
       orderBy: { id: "asc" },
-      include: { 
+      include: {
         franchise: { select: { id: true, name: true, city: true } },
         permission: true
       }
@@ -1661,6 +1782,25 @@ apiRouter.get("/employees", async (req: Request, res: Response) => {
   }
 });
 
+apiRouter.get("/hq-employees", async (req: Request, res: Response) => {
+  try {
+    const list = await db.employee.findMany({
+      where: {
+        franchiseId: null,
+        isDeleted: false,
+        status: "Active"
+      },
+      orderBy: { name: "asc" }
+    });
+    res.json(list.map(emp => {
+      const { password, ...rest } = emp;
+      return rest;
+    }));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 apiRouter.post("/employees", async (req: Request, res: Response) => {
   try {
     const data = req.body;
@@ -1670,7 +1810,7 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
       try {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
-        
+
         // Authorization check: Only SUPER_ADMIN and HQ_USER can create employees
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
           res.status(403).json({ error: "Unauthorized: Only HQ can create employees" });
@@ -1680,12 +1820,12 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER" && decoded.franchiseId) {
           franchiseId = decoded.franchiseId;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
     const normalizedUsername = data.username ? String(data.username).trim().toLowerCase() : null;
-    
+
     const empId = `EMP${Date.now().toString().slice(-6)}`;
 
     const newEmployee = await db.employee.create({
@@ -1709,7 +1849,7 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
         permission: true
       }
     });
-    
+
     const { password, ...rest } = newEmployee;
     res.json({
       ...rest,
@@ -1722,23 +1862,62 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
 
 apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
   try {
+    let requester = "Admin";
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
-        
+        requester = decoded.username || decoded.role || "Admin";
+
         // Authorization check: Only SUPER_ADMIN and HQ_USER can edit employees
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
           res.status(403).json({ error: "Unauthorized: Only HQ can edit employees" });
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const id = String(req.params.id);
     const data = req.body;
-    
+
+    const existing = await db.employee.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: "Employee not found" });
+      return;
+    }
+
+    let transferPending = false;
+    let targetFranchiseId = data.franchiseId;
+
+    // Check if transferring from main branch (franchiseId is null/empty) to a sub-branch (targetFranchiseId is not null/empty)
+    if (!existing.franchiseId && targetFranchiseId && targetFranchiseId !== existing.franchiseId) {
+      // Check if there is already a Pending request for this employee
+      const activeRequest = await db.memberTransferRequest.findFirst({
+        where: {
+          employeeId: id,
+          status: "Pending"
+        }
+      });
+
+      if (!activeRequest) {
+        await db.memberTransferRequest.create({
+          data: {
+            employeeId: id,
+            fromFranchiseId: null,
+            toFranchiseId: targetFranchiseId || null,
+            requestedBy: requester,
+            date: new Date().toISOString().split("T")[0] || "",
+            status: "Pending"
+          }
+        });
+      }
+
+      transferPending = true;
+      // Do not assign the franchiseId yet; keep it as null (main branch) until approved
+      data.franchiseId = null;
+    }
+
     let updateData: any = {
       name: data.name,
       phone: data.phone,
@@ -1775,10 +1954,7 @@ apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
     });
 
     const { password, ...rest } = updated;
-    res.json({
-      ...rest,
-      permissions: updated.permission?.modules || []
-    });
+    res.json(rest);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1791,13 +1967,13 @@ apiRouter.delete("/employees/:id", async (req: Request, res: Response) => {
       try {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
-        
+
         // Authorization check: Only SUPER_ADMIN and HQ_USER can delete employees
         if (decoded.role !== "SUPER_ADMIN" && decoded.role !== "HQ_USER") {
           res.status(403).json({ error: "Unauthorized: Only HQ can delete employees" });
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const id = String(req.params.id);
@@ -1819,7 +1995,7 @@ apiRouter.get("/attendance", async (req: Request, res: Response) => {
       try {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
-        
+
         if (decoded.role === "SUPER_ADMIN" || decoded.role === "HQ_USER") {
           // HQ sees all
         } else if (decoded.role === "FRANCHISE_ADMIN" || decoded.role === "BRANCH_MANAGER") {
@@ -1829,12 +2005,12 @@ apiRouter.get("/attendance", async (req: Request, res: Response) => {
           // Normal employees see only their own attendance
           tenantFilter.employeeId = decoded.id;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
-    const list = await db.attendance.findMany({ 
-      where: tenantFilter, 
+    const list = await db.attendance.findMany({
+      where: tenantFilter,
       orderBy: { date: "desc" },
-      include: { 
+      include: {
         franchise: { select: { id: true, name: true, city: true } },
         employee: { select: { id: true, name: true, role: true } }
       }
@@ -1849,7 +2025,7 @@ apiRouter.post("/attendance/check-in", async (req: Request, res: Response) => {
   try {
     const { employeeId } = req.body;
     let franchiseId: string | null = null;
-    
+
     const emp = await db.employee.findUnique({ where: { id: employeeId } });
     if (!emp) {
       res.status(404).json({ error: "Employee not found" });
@@ -1877,6 +2053,9 @@ apiRouter.post("/attendance/check-in", async (req: Request, res: Response) => {
         clockIn,
         franchiseId,
       },
+      include: {
+        employee: { select: { id: true, name: true, role: true } }
+      }
     });
 
     res.json(newAttendance);
@@ -1903,6 +2082,9 @@ apiRouter.put("/attendance/check-out", async (req: Request, res: Response) => {
     const updated = await db.attendance.update({
       where: { id: existing.id },
       data: { clockOut },
+      include: {
+        employee: { select: { id: true, name: true, role: true } }
+      }
     });
 
     res.json(updated);
@@ -1915,7 +2097,7 @@ apiRouter.put("/attendance/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const data = req.body;
-    
+
     const updated = await db.attendance.update({
       where: { id },
       data: {
@@ -1930,3 +2112,285 @@ apiRouter.put("/attendance/:id", async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// File Upload Endpoint
+apiRouter.post("/upload", upload.single("file"), (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MEMBER / BRANCH TRANSFER REQUESTS
+// ═══════════════════════════════════════════════════════════════
+apiRouter.post("/member-transfers", async (req: Request, res: Response) => {
+  try {
+    const { employeeId, toFranchiseId, newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password, role } = req.body;
+    let requester = "Admin";
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        requester = decoded.username || decoded.role || "Admin";
+      } catch (e) { }
+    }
+
+    const request = await db.memberTransferRequest.create({
+      data: {
+        employeeId: employeeId || null,
+        fromFranchiseId: null,
+        toFranchiseId: toFranchiseId || null,
+        newMemberName: newMemberName || null,
+        newMemberPhone: newMemberPhone || null,
+        newMemberEmail: newMemberEmail || null,
+        panNumber: panNumber || null,
+        aadharNumber: aadharNumber || null,
+        address: address || null,
+        panDocUrl: panDocUrl || null,
+        aadharDocUrl: aadharDocUrl || null,
+        username: username || null,
+        password: password || null,
+        role: role || "TECHNICIAN",
+        requestedBy: requester,
+        date: new Date().toISOString().split("T")[0] || "",
+        status: "Pending"
+      }
+    });
+
+    res.json(request);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.get("/member-transfers", async (req: Request, res: Response) => {
+  try {
+    const requests = await db.memberTransferRequest.findMany({
+      where: { isDeleted: false },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const enriched = await Promise.all(requests.map(async (r) => {
+      let empName = r.newMemberName || "Unknown";
+      let empRole = r.role || "TECHNICIAN";
+      if (r.employeeId) {
+        const emp = await db.employee.findUnique({
+          where: { id: r.employeeId },
+          select: { name: true, role: true }
+        });
+        if (emp) {
+          empName = emp.name;
+          empRole = emp.role;
+        }
+      }
+
+      let toFranchise = null;
+      if (r.toFranchiseId) {
+        toFranchise = await db.franchise.findUnique({
+          where: { id: r.toFranchiseId },
+          select: { name: true, city: true }
+        });
+      }
+
+      return {
+        ...r,
+        employeeName: empName,
+        employeeRole: empRole,
+        toFranchiseName: toFranchise?.name || "Unknown",
+        toFranchiseCity: toFranchise?.city || "Unknown"
+      };
+    }));
+
+    res.json(enriched);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const request = await db.memberTransferRequest.findUnique({ where: { id } });
+    if (!request) {
+      res.status(404).json({ error: "Transfer request not found" });
+      return;
+    }
+
+    if (request.status !== "Pending") {
+      res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+      return;
+    }
+
+    // Determine user role
+    const authHeader = req.headers.authorization;
+    let userRole = "UNKNOWN";
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
+        userRole = decoded.role;
+      } catch (e) { }
+    }
+
+    let hqApproved = request.hqApproved;
+    let adminApproved = request.adminApproved;
+
+    if (userRole === "HQ_USER") hqApproved = true;
+    if (userRole === "SUPER_ADMIN") adminApproved = true;
+
+    // Check if fully approved
+    const isFullyApproved = hqApproved && adminApproved;
+
+    if (!isFullyApproved) {
+      // Update flags and return without creating employee
+      const updatedRequest = await db.memberTransferRequest.update({
+        where: { id },
+        data: { hqApproved, adminApproved }
+      });
+      res.json(updatedRequest);
+      return;
+    }
+
+    let finalUsername: string | undefined;
+    let finalPassword: string | undefined;
+
+    if (!request.employeeId) {
+      // Create a new employee on approval
+      const empId = `EMP${Date.now().toString().slice(-6)}`;
+      let baseUsername = request.username || (request.newMemberName || "user").toLowerCase().replace(/\s+/g, "_");
+      let username = baseUsername;
+
+      // Ensure username uniqueness
+      const existingUser = await db.employee.findUnique({ where: { username } });
+      if (existingUser) {
+        // Append franchise prefix for clarity instead of random numbers
+        const franchisePrefix = request.toFranchiseId ? request.toFranchiseId.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+        username = franchisePrefix ? `${baseUsername}_${franchisePrefix}` : `${baseUsername}_${Date.now().toString().slice(-4)}`;
+        // Double-check uniqueness
+        const stillExists = await db.employee.findUnique({ where: { username } });
+        if (stillExists) {
+          username = `${baseUsername}_${Date.now().toString().slice(-6)}`;
+        }
+      }
+
+      finalUsername = username;
+      finalPassword = request.password || "password123";
+      const hashedPassword = await bcrypt.hash(finalPassword, 10);
+
+      await db.employee.create({
+        data: {
+          id: empId,
+          name: request.newMemberName || "New Member",
+          phone: request.newMemberPhone || null,
+          email: request.newMemberEmail || null,
+          status: "Active",
+          username,
+          password: hashedPassword,
+          role: request.role || "TECHNICIAN",
+          franchiseId: request.toFranchiseId
+        }
+      });
+      console.log(`[APPROVAL] Created employee username: "${username}" with ID ${empId}`);
+    } else {
+      // Update Employee branch
+      await db.employee.update({
+        where: { id: request.employeeId },
+        data: { franchiseId: request.toFranchiseId }
+      });
+    }
+
+    // Update Request status and store final username
+    const updateData: any = { status: "Approved", hqApproved: true, adminApproved: true };
+    if (finalUsername) {
+      updateData.username = finalUsername;
+    }
+
+    const updatedRequest = await db.memberTransferRequest.update({
+      where: { id },
+      data: updateData
+    });
+
+    // Return the final credentials so the frontend can display them
+    res.json({
+      ...updatedRequest,
+      finalUsername: finalUsername || undefined,
+      finalPassword: finalPassword || undefined
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.post("/member-transfers/:id/reject", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const request = await db.memberTransferRequest.findUnique({ where: { id } });
+    if (!request) {
+      res.status(404).json({ error: "Transfer/Recruitment request not found" });
+      return;
+    }
+
+    if (request.status !== "Pending") {
+      res.status(400).json({ error: `Request already ${request.status.toLowerCase()}` });
+      return;
+    }
+
+    // Update Request status
+    const updatedRequest = await db.memberTransferRequest.update({
+      where: { id },
+      data: { status: "Rejected" }
+    });
+
+    res.json(updatedRequest);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/member-transfers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { newMemberName, newMemberPhone, newMemberEmail, panNumber, aadharNumber, address, panDocUrl, aadharDocUrl, username, password, role } = req.body;
+    const updated = await db.memberTransferRequest.update({
+      where: { id },
+      data: {
+        newMemberName: newMemberName || null,
+        newMemberPhone: newMemberPhone || null,
+        newMemberEmail: newMemberEmail || null,
+        panNumber: panNumber || null,
+        aadharNumber: aadharNumber || null,
+        address: address || null,
+        panDocUrl: panDocUrl || null,
+        aadharDocUrl: aadharDocUrl || null,
+        username: username || null,
+        password: password || null,
+        role: role || null
+      }
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.delete("/member-transfers/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.memberTransferRequest.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date().toISOString() }
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+

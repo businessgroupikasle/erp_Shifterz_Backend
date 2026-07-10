@@ -179,6 +179,7 @@ model Job {
   photos           String[]
   technicianId     String?
   franchiseId      String?
+  createdAt        DateTime   @default(now())
   franchise        Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted        Boolean    @default(false)
   deletedAt        String?
