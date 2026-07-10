@@ -220,20 +220,21 @@ model Setting {
 }
 
 model Employee {
-  id           String     @id
+  id           String          @id
   name         String
   phone        String?
   email        String?
-  status       String     @default("Active")
-  username     String?    @unique
+  status       String          @default("Active")
+  username     String?         @unique
   password     String?
-  role         String     @default("TECHNICIAN") // SUPER_ADMIN, HQ_USER, FRANCHISE_ADMIN, RECEPTIONIST, SERVICE_ADVISOR, TECHNICIAN, BILLING
-  hqControlled Boolean    @default(false)
+  role         String          @default("TECHNICIAN") // SUPER_ADMIN, HQ_USER, FRANCHISE_ADMIN, RECEPTIONIST, SERVICE_ADVISOR, TECHNICIAN, BILLING
+  permission   UserPermission?
+  hqControlled Boolean         @default(false)
   franchiseId  String?
-  franchise    Franchise? @relation(fields: [franchiseId], references: [id])
+  franchise    Franchise?      @relation(fields: [franchiseId], references: [id])
   attendances  Attendance[]
-  isDeleted   Boolean    @default(false)
-  deletedAt   String?
+  isDeleted    Boolean         @default(false)
+  deletedAt    String?
 }
 
 model Attendance {
@@ -275,3 +276,18 @@ model Appointment {
   isDeleted   Boolean    @default(false)
   deletedAt   String?
 }
+
+model UserPermission {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  modules     String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RolePermission {
+  role        String   @id
+  permissions String[]
+}
+

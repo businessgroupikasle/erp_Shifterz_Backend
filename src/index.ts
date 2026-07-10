@@ -32,9 +32,21 @@ app.get("/health", (req, res) => {
   res.json({ status: "healthy", timestamp: new Date() });
 });
 
+import { exec } from "child_process";
+
 // Start Server
 app.listen(PORT, async () => {
   console.log(`Shifterz backend running on port ${PORT}`);
+  
+  // Automigrate & regenerate Prisma client on startup
+  console.log("[Auto-Migration] Running npx prisma db push...");
+  exec("npx prisma db push", (err, stdout, stderr) => {
+    if (err) {
+      console.error("[Auto-Migration] Failed to migrate database:", err);
+    } else {
+      console.log("[Auto-Migration] Database migrated and generated successfully:", stdout);
+    }
+  });
 });
 
-// Restart trigger
+// Restart trigger: prisma schema model updated to UserPermission relations table v2

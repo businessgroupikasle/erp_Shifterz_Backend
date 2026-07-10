@@ -15,18 +15,44 @@ async function main() {
   console.log("Seeding Shifterz database...");
 
   // Clean old data
+  await prisma.attendance.deleteMany();
+  await prisma.userPermission.deleteMany();
+  await prisma.employee.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.inventoryRequest.deleteMany();
   await prisma.lead.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.inventory.deleteMany();
   await prisma.service.deleteMany();
-  await prisma.franchise.deleteMany();
-  await prisma.customer.deleteMany();
+  await prisma.outPass.deleteMany();
   await prisma.carIn.deleteMany();
   await prisma.job.deleteMany();
-  await prisma.outPass.deleteMany();
+  await prisma.customer.deleteMany();
+  await prisma.franchise.deleteMany();
   await prisma.setting.deleteMany();
-  await prisma.employee.deleteMany();
+  await prisma.rolePermission.deleteMany();
+
+  // Role Permissions Seed Matrix
+  const DEFAULT_MATRIX = {
+    SUPER_ADMIN: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance", "settings", "roles"],
+    HQ_USER: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance", "settings"],
+    FRANCHISE_ADMIN: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance"],
+    BRANCH_MANAGER: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "attendance"],
+    RECEPTION_EXECUTIVE: ["dashboard", "carin", "outpass", "customers", "leads"],
+    SERVICE_ADVISOR: ["dashboard", "carin", "jobs", "customers", "leads"],
+    TECHNICIAN: ["dashboard", "jobs", "attendance"],
+    QUALITY_INSPECTOR: ["dashboard", "jobs", "carin"],
+    BILLING_EXECUTIVE: ["dashboard", "billing", "payments", "reports"],
+    INVENTORY_EXECUTIVE: ["dashboard", "inventory", "reports"],
+  };
+
+  await prisma.rolePermission.createMany({
+    data: Object.entries(DEFAULT_MATRIX).map(([role, permissions]) => ({
+      role,
+      permissions,
+    })),
+  });
   // Settings
   await prisma.setting.create({
     data: {
@@ -192,10 +218,10 @@ async function main() {
   // Attendance
   await prisma.attendance.createMany({
     data: [
-      { employeeId: "EMP001", date: todayStr, status: "Present", clockIn: "08:50", franchiseId: "F001" },
-      { employeeId: "EMP002", date: todayStr, status: "Present", clockIn: "08:55", franchiseId: "F001" },
-      { employeeId: "EMP003", date: todayStr, status: "Absent", franchiseId: "F001" },
-      { employeeId: "EMP004", date: todayStr, status: "Present", clockIn: "09:05", franchiseId: "F001" },
+      { employeeId: "TECH-001", date: todayStr, status: "Present", clockIn: "08:50", franchiseId: "F001" },
+      { employeeId: "TECH-002", date: todayStr, status: "Present", clockIn: "08:55", franchiseId: "F001" },
+      { employeeId: "TECH-003", date: todayStr, status: "Absent", franchiseId: "F001" },
+      { employeeId: "TECH-004", date: todayStr, status: "Present", clockIn: "09:05", franchiseId: "F001" },
     ],
   });
 

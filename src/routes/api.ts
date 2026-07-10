@@ -3,6 +3,7 @@ import { db } from "../lib/db.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import multer from "multer";
+import { resolveUserPermissions } from "../lib/auth.js";
 import path from "path";
 
 export const apiRouter = Router();
@@ -72,7 +73,12 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    let user = await db.employee.findUnique({ where: { username } });
+    const normalizedUsername = String(username).trim().toLowerCase();
+
+    let user = await db.employee.findUnique({
+      where: { username: normalizedUsername },
+      include: { permission: true }
+    });
 
     if (!user || !user.password) {
       res.status(401).json({ error: "Invalid username or password" });
@@ -85,12 +91,15 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const baseRole = user.role.split("|")[0];
+    const resolvedPermissions = await resolveUserPermissions(user.id, user.role);
     const tokenPayload = { 
       id: user.id, 
       username: user.username, 
       role: user.role, 
+      permissions: resolvedPermissions,
       franchiseId: user.franchiseId,
-      ...(user.role === "TECHNICIAN" ? { technicianId: user.id } : {})
+      ...(baseRole === "TECHNICIAN" || baseRole === "QUALITY_INSPECTOR" ? { technicianId: user.id } : {})
     };
 
     const token = jwt.sign(
@@ -123,23 +132,57 @@ apiRouter.get("/auth/me", async (req: Request, res: Response): Promise<void> => 
     }
     const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
 
-    const userData = await db.employee.findUnique({ where: { id: decoded.id } });
+    const userData = await db.employee.findUnique({
+      where: { id: decoded.id },
+      include: { permission: true }
+    });
     if (!userData) {
       res.status(401).json({ error: "User not found" });
       return;
     }
 
+    const baseRole = userData.role.split("|")[0];
+    const resolvedPermissions = await resolveUserPermissions(userData.id, userData.role);
     res.json({
       user: {
         id: userData.id,
         username: userData.username,
         role: userData.role,
+        permissions: resolvedPermissions,
         franchiseId: userData.franchiseId,
-        ...(userData.role === "TECHNICIAN" ? { technicianId: userData.id } : {})
+        ...(baseRole === "TECHNICIAN" || baseRole === "QUALITY_INSPECTOR" ? { technicianId: userData.id } : {})
       },
     });
   } catch (error: any) {
     res.status(401).json({ error: "Invalid or expired token" });
+  }
+});
+
+apiRouter.get("/auth/roles/permissions", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const list = await db.rolePermission.findMany();
+    res.json(list);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+apiRouter.put("/auth/roles/permissions/:role", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { role } = req.params;
+    const { permissions } = req.body;
+    if (!Array.isArray(permissions)) {
+      res.status(400).json({ error: "permissions must be an array of strings" });
+      return;
+    }
+    const updated = await db.rolePermission.upsert({
+      where: { role },
+      update: { permissions },
+      create: { role, permissions },
+    });
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -1038,7 +1081,7 @@ apiRouter.get("/jobs", async (req: Request, res: Response): Promise<void> => {
           const decoded = jwt.verify(token as string, process.env.JWT_SECRET || "shifterz_secret_key") as any;
           userInfo = { role: decoded.role, technicianId: decoded.technicianId };
 
-          if (decoded.role === "technician" && decoded.technicianId) {
+          if (decoded.role?.toUpperCase() === "TECHNICIAN" && decoded.technicianId) {
             filter = { technicianId: decoded.technicianId };
           }
         } catch (e) {
@@ -1446,7 +1489,15 @@ apiRouter.post("/technicians", async (req: Request, res: Response) => {
         password: hashedPassword,
         franchiseId: franchiseId,
         role: data.role || "TECHNICIAN",
+        permission: {
+          create: {
+            modules: data.permissions || [],
+          }
+        }
       },
+      include: {
+        permission: true
+      }
     });
     res.json(newTech);
   } catch (error: any) {
@@ -1593,11 +1644,17 @@ apiRouter.get("/employees", async (req: Request, res: Response) => {
     const list = await db.employee.findMany({ 
       where: tenantFilter, 
       orderBy: { id: "asc" },
-      include: { franchise: { select: { id: true, name: true, city: true } } }
+      include: { 
+        franchise: { select: { id: true, name: true, city: true } },
+        permission: true
+      }
     });
     res.json(list.map(emp => {
       const { password, ...rest } = emp;
-      return rest;
+      return {
+        ...rest,
+        permissions: emp.permission?.modules || []
+      };
     }));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1627,6 +1684,7 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
     }
 
     const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : null;
+    const normalizedUsername = data.username ? String(data.username).trim().toLowerCase() : null;
     
     const empId = `EMP${Date.now().toString().slice(-6)}`;
 
@@ -1637,15 +1695,26 @@ apiRouter.post("/employees", async (req: Request, res: Response) => {
         phone: data.phone || null,
         email: data.email || null,
         status: data.status || "Active",
-        username: data.username || null,
+        username: normalizedUsername,
         password: hashedPassword,
         role: data.role || "TECHNICIAN",
         franchiseId: franchiseId,
+        permission: {
+          create: {
+            modules: data.permissions || [],
+          }
+        }
       },
+      include: {
+        permission: true
+      }
     });
     
     const { password, ...rest } = newEmployee;
-    res.json(rest);
+    res.json({
+      ...rest,
+      permissions: newEmployee.permission?.modules || []
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1676,19 +1745,40 @@ apiRouter.put("/employees/:id", async (req: Request, res: Response) => {
       email: data.email,
       status: data.status,
       role: data.role,
-      franchiseId: data.franchiseId,
+      franchiseId: data.franchiseId || null,
     };
 
-    if (data.username) updateData.username = data.username;
+    if (data.username !== undefined) {
+      updateData.username = data.username ? String(data.username).trim().toLowerCase() : null;
+    }
     if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+
+    if (data.permissions) {
+      updateData.permission = {
+        upsert: {
+          create: {
+            modules: data.permissions,
+          },
+          update: {
+            modules: data.permissions,
+          }
+        }
+      };
+    }
 
     const updated = await db.employee.update({
       where: { id },
       data: updateData,
+      include: {
+        permission: true
+      }
     });
 
     const { password, ...rest } = updated;
-    res.json(rest);
+    res.json({
+      ...rest,
+      permissions: updated.permission?.modules || []
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
