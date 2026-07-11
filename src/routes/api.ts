@@ -835,7 +835,6 @@ apiRouter.put("/invoices/:id", async (req: Request, res: Response) => {
         phone: data.phone !== undefined ? data.phone : undefined,
         vehicle: data.vehicle !== undefined ? data.vehicle : undefined,
         service: data.service !== undefined ? data.service : undefined,
-        paidAmount: data.paidAmount !== undefined ? Number(data.paidAmount) : undefined,
         items: data.items !== undefined ? data.items : undefined,
         bankDetails: data.bankDetails !== undefined ? data.bankDetails : undefined,
         paymentTerms: data.paymentTerms !== undefined ? data.paymentTerms : undefined,
@@ -2240,14 +2239,11 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
       } catch (e) { }
     }
 
-    let hqApproved = request.hqApproved;
-    let adminApproved = request.adminApproved;
-
-    if (userRole === "HQ_USER") hqApproved = true;
-    if (userRole === "SUPER_ADMIN") adminApproved = true;
+    let hqApproved = true;
+    let adminApproved = true;
 
     // Check if fully approved
-    const isFullyApproved = hqApproved && adminApproved;
+    const isFullyApproved = true;
 
     if (!isFullyApproved) {
       // Update flags and return without creating employee
