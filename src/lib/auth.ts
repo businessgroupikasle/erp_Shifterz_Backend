@@ -24,7 +24,7 @@ export async function resolveUserPermissions(userId: string, role: string): Prom
       return user.permission.modules;
     }
     
-    const baseRole = role.split("|")[0];
+    const baseRole = role.split("|")[0] || "";
     const rp = await db.rolePermission.findUnique({
       where: { role: baseRole },
     });
@@ -49,7 +49,7 @@ export async function resolveUserPermissions(userId: string, role: string): Prom
     INVENTORY_EXECUTIVE: ["dashboard", "inventory", "reports"],
   };
   
-  const base = role.split("|")[0];
+  const base = role.split("|")[0] || "";
   return fallbackMatrix[base] || [];
 }
 

@@ -168,8 +168,8 @@ apiRouter.get("/auth/roles/permissions", async (req: Request, res: Response): Pr
 
 apiRouter.put("/auth/roles/permissions/:role", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { role } = req.params;
-    const { permissions } = req.body;
+    const role = req.params.role as string;
+    const permissions = req.body.permissions as string[];
     if (!Array.isArray(permissions)) {
       res.status(400).json({ error: "permissions must be an array of strings" });
       return;
@@ -785,8 +785,33 @@ apiRouter.get("/invoices", async (req: Request, res: Response) => {
 apiRouter.post("/invoices", async (req: Request, res: Response) => {
   try {
     const data = req.body;
-    const pre = data.type === "Invoice" ? "INV" : data.type === "Quotation" ? "QT" : "EST";
-    const invId = await generateSequentialId(pre);
+    
+    const date = new Date(data.date || Date.now());
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const startYear = month >= 3 ? year : year - 1;
+    const endYear = startYear + 1;
+    const fy = `${startYear.toString().slice(2)}-${endYear.toString().slice(2)}`;
+
+    const docTypePrefix = {
+      Invoice: `STZ-${fy}-`,
+      Quotation: `STZ-QT-${fy}-`,
+      Estimate: `STZ-EST-${fy}-`,
+    }[data.type as string] || `STZ-DOC-${fy}-`;
+
+    const allRecords = await db.invoice.findMany({
+      where: { id: { startsWith: docTypePrefix } },
+      select: { id: true }
+    });
+    let maxId = 0;
+    for (const record of allRecords) {
+      const numStr = record.id.replace(docTypePrefix, "");
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxId) {
+        maxId = num;
+      }
+    }
+    const invId = `${docTypePrefix}${maxId + 1}`;
 
     const newInv = await db.invoice.create({
       data: {
@@ -2278,8 +2303,8 @@ apiRouter.post("/member-transfers/:id/approve", async (req: Request, res: Respon
       }
 
       finalUsername = username;
-      finalPassword = request.password || "password123";
-      const hashedPassword = await bcrypt.hash(finalPassword, 10);
+      finalPassword = (request.password || "password123") as string;
+      const hashedPassword = await bcrypt.hash(finalPassword as string, 10);
 
       await db.employee.create({
         data: {

@@ -292,3 +292,23 @@ model RolePermission {
   permissions String[]
 }
 
+
+model MemberTransferRequest {
+  id              String   @id @default(cuid())
+  employeeId      String?
+  fromFranchiseId String?
+  toFranchiseId   String?
+  requestedBy     String
+  date            String
+  status          String
+  username        String?
+  password        String?
+  newMemberName   String?
+  newMemberPhone  String?
+  newMemberEmail  String?
+  role            String?
+  isDeleted       Boolean  @default(false)
+  deletedAt       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
