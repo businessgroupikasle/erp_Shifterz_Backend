@@ -92,11 +92,13 @@ apiRouter.post("/auth/login", async (req: Request, res: Response): Promise<void>
     }
 
     const baseRole = user.role.split("|")[0];
+    const resolvedPermissions = await resolveUserPermissions(user.id, user.role);
 
     const tokenPayload = {
       id: user.id,
       username: user.username,
       role: user.role,
+      permissions: resolvedPermissions,
       franchiseId: user.franchiseId,
       ...(baseRole === "TECHNICIAN" || baseRole === "QUALITY_INSPECTOR" ? { technicianId: user.id } : {})
     };
@@ -154,6 +156,47 @@ apiRouter.get("/auth/me", async (req: Request, res: Response): Promise<void> => 
     });
   } catch (error: any) {
     res.status(401).json({ error: "Invalid or expired token" });
+  }
+});
+
+apiRouter.put("/auth/profile", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      res.status(401).json({ error: "Missing token" });
+      return;
+    }
+    const token = authHeader.split(" ")[1];
+    const secret = process.env.JWT_SECRET || "fallback_secret";
+    const decoded = jwt.verify(token, secret) as any;
+
+    const { name, email, phone, currentPassword, newPassword } = req.body;
+    const user = await db.user.findUnique({ where: { id: decoded.userId } });
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    let updateData: any = { name, email, phone };
+
+    if (newPassword && currentPassword) {
+      // Basic check, adjust if using bcrypt
+      if (currentPassword !== user.password) {
+        res.status(400).json({ error: "Current password incorrect" });
+        return;
+      }
+      updateData.password = newPassword;
+    }
+
+    const updated = await db.user.update({
+      where: { id: decoded.userId },
+      data: updateData
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -834,6 +877,8 @@ apiRouter.post("/invoices", async (req: Request, res: Response) => {
         paymentTerms: data.paymentTerms || null,
         deliveryTerms: data.deliveryTerms || null,
         authorizedSignatory: data.authorizedSignatory || null,
+        createdBy: data.createdBy || null,
+        approvedBy: data.status === "Approved" ? data.createdBy : null,
       },
     });
     res.json(newInv);
@@ -846,9 +891,18 @@ apiRouter.put("/invoices/:id", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const data = req.body;
+    
+    // Check if status changed to cancelled or approved
+    const existing = await db.invoice.findUnique({ where: { id } });
+    const auditData: any = {};
+    if (data.modifiedBy) auditData.modifiedBy = data.modifiedBy;
+    if (data.status === "Cancelled" && existing?.status !== "Cancelled") auditData.cancelledBy = data.modifiedBy || data.cancelledBy;
+    if (data.status === "Approved" && existing?.status !== "Approved") auditData.approvedBy = data.modifiedBy || data.approvedBy;
+
     const updated = await db.invoice.update({
       where: { id },
       data: {
+        ...auditData,
         status: data.status !== undefined ? data.status : undefined,
         notes: data.notes !== undefined ? data.notes : undefined,
         dueDate: data.dueDate !== undefined ? data.dueDate : undefined,
@@ -924,6 +978,7 @@ apiRouter.post("/payments", async (req: Request, res: Response): Promise<void> =
         date: data.date || new Date().toISOString().slice(0, 10),
         ref: data.ref || "",
         notes: data.notes || "",
+        createdBy: data.createdBy || null,
       },
     });
 

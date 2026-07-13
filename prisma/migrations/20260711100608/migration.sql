@@ -289,31 +289,52 @@ CREATE TABLE "Appointment" (
 );
 
 -- CreateTable
+CREATE TABLE "UserPermission" (
+    "id" TEXT NOT NULL,
+    "employeeId" TEXT NOT NULL,
+    "modules" TEXT[],
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "UserPermission_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RolePermission" (
+    "role" TEXT NOT NULL,
+    "permissions" TEXT[],
+
+    CONSTRAINT "RolePermission_pkey" PRIMARY KEY ("role")
+);
+
+-- CreateTable
 CREATE TABLE "MemberTransferRequest" (
     "id" TEXT NOT NULL,
     "employeeId" TEXT,
     "fromFranchiseId" TEXT,
     "toFranchiseId" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'Pending',
     "requestedBy" TEXT NOT NULL,
     "date" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "username" TEXT,
+    "password" TEXT,
     "newMemberName" TEXT,
     "newMemberPhone" TEXT,
     "newMemberEmail" TEXT,
-    "panNumber" TEXT,
-    "aadharNumber" TEXT,
-    "address" TEXT,
-    "panDocUrl" TEXT,
-    "aadharDocUrl" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "role" TEXT,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
     "deletedAt" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "MemberTransferRequest_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Employee_username_key" ON "Employee"("username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UserPermission_employeeId_key" ON "UserPermission"("employeeId");
 
 -- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_franchiseId_fkey" FOREIGN KEY ("franchiseId") REFERENCES "Franchise"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -353,3 +374,6 @@ ALTER TABLE "InventoryRequest" ADD CONSTRAINT "InventoryRequest_franchiseId_fkey
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_franchiseId_fkey" FOREIGN KEY ("franchiseId") REFERENCES "Franchise"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserPermission" ADD CONSTRAINT "UserPermission_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE CASCADE ON UPDATE CASCADE;

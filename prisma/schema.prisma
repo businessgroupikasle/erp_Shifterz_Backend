@@ -47,8 +47,14 @@ model Invoice {
   authorizedSignatory String?
   franchiseId         String?
   franchise           Franchise? @relation(fields: [franchiseId], references: [id])
-  isDeleted   Boolean    @default(false)
-  deletedAt   String?
+  isDeleted           Boolean    @default(false)
+  deletedAt           String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @default(now()) @updatedAt
+  createdBy           String?
+  modifiedBy          String?
+  cancelledBy         String?
+  approvedBy          String?
 }
 
 model Payment {
@@ -64,6 +70,9 @@ model Payment {
   franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
   deletedAt   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+  createdBy   String?
 }
 
 model Inventory {
