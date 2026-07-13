@@ -1,4 +1,41 @@
 import jwt from "jsonwebtoken";
+import { db } from "./db.js";
+// Helper to resolve user permissions based on user-specific overrides or role defaults
+export async function resolveUserPermissions(userId, role) {
+    try {
+        const user = await db.employee.findUnique({
+            where: { id: userId },
+            include: { permission: true },
+        });
+        if (user?.permission?.modules && user.permission.modules.length > 0) {
+            return user.permission.modules;
+        }
+        const baseRole = role.split("|")[0] || "";
+        const rp = await db.rolePermission.findUnique({
+            where: { role: baseRole },
+        });
+        if (rp?.permissions) {
+            return rp.permissions;
+        }
+    }
+    catch (err) {
+        console.error("Error resolving user permissions:", err);
+    }
+    const fallbackMatrix = {
+        SUPER_ADMIN: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance", "settings", "roles"],
+        HQ_USER: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance", "settings"],
+        FRANCHISE_ADMIN: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "employees", "attendance"],
+        BRANCH_MANAGER: ["dashboard", "carin", "jobs", "outpass", "leads", "customers", "billing", "payments", "inventory", "reports", "attendance"],
+        RECEPTION_EXECUTIVE: ["dashboard", "carin", "outpass", "customers", "leads"],
+        SERVICE_ADVISOR: ["dashboard", "carin", "jobs", "customers", "leads"],
+        TECHNICIAN: ["dashboard", "jobs", "attendance"],
+        QUALITY_INSPECTOR: ["dashboard", "jobs", "carin"],
+        BILLING_EXECUTIVE: ["dashboard", "billing", "payments", "reports"],
+        INVENTORY_EXECUTIVE: ["dashboard", "inventory", "reports"],
+    };
+    const base = role.split("|")[0] || "";
+    return fallbackMatrix[base] || [];
+}
 // Middleware to verify JWT token
 export const requireAuth = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -13,12 +50,30 @@ export const requireAuth = (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "shifterz_secret_key");
+        // Extract base role if serialized with custom dashboard options (e.g. ROLE_NAME|leads,carin)
+        if (decoded.role && typeof decoded.role === "string" && decoded.role.includes("|")) {
+            decoded.role = decoded.role.split("|")[0];
+        }
         req.user = decoded;
         next();
     }
     catch (err) {
         res.status(401).json({ error: "Invalid token" });
     }
+};
+// Middleware to require specific permissions
+export const requirePermission = (permission) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            res.status(401).json({ error: "Not authenticated" });
+            return;
+        }
+        if (!req.user.permissions || !req.user.permissions.includes(permission)) {
+            res.status(403).json({ error: `Forbidden: Missing required permission: ${permission}` });
+            return;
+        }
+        next();
+    };
 };
 // Middleware to require specific roles (e.g. SUPER_ADMIN, FRANCHISE_ADMIN)
 export const requireRole = (roles) => {

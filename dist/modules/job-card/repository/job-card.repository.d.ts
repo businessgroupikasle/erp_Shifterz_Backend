@@ -1,0 +1,94 @@
+import type { CreateJobCardDTO, UpdateJobCardDTO } from '../validation/job-card.validation.js';
+export declare class JobCardRepository {
+    findAll(filter: any): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }[]>;
+    findEmployeeByName(name: string): Promise<{
+        id: string;
+        username: string | null;
+        name: string;
+        phone: string | null;
+        email: string | null;
+        status: string;
+        password: string | null;
+        role: string;
+        hqControlled: boolean;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+    } | null>;
+    create(id: string, data: CreateJobCardDTO, techId: string | null): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+    update(id: string, data: UpdateJobCardDTO): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+    softDelete(id: string): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+}
+//# sourceMappingURL=job-card.repository.d.ts.map

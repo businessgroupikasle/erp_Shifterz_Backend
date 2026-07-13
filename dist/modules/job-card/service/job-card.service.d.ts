@@ -1,0 +1,83 @@
+import { JobCardRepository } from '../repository/job-card.repository.js';
+import type { CreateJobCardDTO, UpdateJobCardDTO } from '../validation/job-card.validation.js';
+export declare class JobCardService {
+    private readonly repository;
+    constructor(repository?: JobCardRepository);
+    getJobs(filter: any): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }[]>;
+    createJob(data: CreateJobCardDTO): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+    updateJob(id: string, data: UpdateJobCardDTO): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+    deleteJob(id: string): Promise<{
+        id: string;
+        status: string;
+        franchiseId: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
+        createdAt: Date;
+        service: string;
+        customer: string;
+        vehicle: string;
+        notes: string;
+        technician: string;
+        priority: string;
+        startDate: string;
+        estCompletion: string;
+        actualCompletion: string | null;
+        photos: string[];
+        technicianId: string | null;
+    }>;
+}
+//# sourceMappingURL=job-card.service.d.ts.map
