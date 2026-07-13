@@ -2,9 +2,9 @@ export declare class EmployeeRepository {
     findAllEmployees(tenantFilter: any): Promise<({
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
         franchise: {
@@ -14,13 +14,13 @@ export declare class EmployeeRepository {
         } | null;
     } & {
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -28,13 +28,13 @@ export declare class EmployeeRepository {
     })[]>;
     findHqEmployees(): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -42,13 +42,13 @@ export declare class EmployeeRepository {
     }[]>;
     findTechnicians(): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -58,20 +58,20 @@ export declare class EmployeeRepository {
     create(id: string, data: any, hashedPassword: string | null, normalizedUsername: string | null): Promise<{
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
     } & {
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -80,20 +80,20 @@ export declare class EmployeeRepository {
     update(id: string, data: any): Promise<{
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
     } & {
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -101,20 +101,20 @@ export declare class EmployeeRepository {
     }>;
     updatePermissions(employeeId: string, modules: string[]): Promise<{
         id: string;
+        createdAt: Date;
         employeeId: string;
         modules: string[];
-        createdAt: Date;
         updatedAt: Date;
     }>;
     softDelete(id: string): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;

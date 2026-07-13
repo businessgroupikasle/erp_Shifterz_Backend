@@ -1,13 +1,13 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../lib/db.js";
-import { requireAuth, requireRole, type AuthRequest } from "../lib/auth.js";
+import { authenticate as requireAuth, requireRole, type AuthRequest } from "../middleware/auth.middleware.js";
 import bcrypt from "bcrypt";
 
 export const hqRouter = Router();
 
 // Secure all routes in this router to SUPER_ADMIN or HQ_USER
 hqRouter.use(requireAuth);
-hqRouter.use(requireRole(["SUPER_ADMIN", "HQ_USER"]));
+hqRouter.use(requireRole("SUPER_ADMIN", "HQ_USER"));
 
 // ═══════════════════════════════════════════════════════════════
 // FRANCHISE MANAGEMENT (HQ Only)

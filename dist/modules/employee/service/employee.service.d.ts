@@ -7,9 +7,9 @@ export declare class EmployeeService {
         permissions: string[];
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
         franchise: {
@@ -18,12 +18,12 @@ export declare class EmployeeService {
             city: string;
         } | null;
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
-        role: string;
+        email: string | null;
+        username: string | null;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -31,12 +31,12 @@ export declare class EmployeeService {
     }[]>;
     getHqEmployees(): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
-        role: string;
+        email: string | null;
+        username: string | null;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -44,13 +44,13 @@ export declare class EmployeeService {
     }[]>;
     getTechnicians(): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -60,18 +60,18 @@ export declare class EmployeeService {
         permissions: string[];
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
-        role: string;
+        email: string | null;
+        username: string | null;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -81,18 +81,18 @@ export declare class EmployeeService {
         permissions: string[];
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
-        role: string;
+        email: string | null;
+        username: string | null;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -100,13 +100,13 @@ export declare class EmployeeService {
     }>;
     deleteEmployee(id: string): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;

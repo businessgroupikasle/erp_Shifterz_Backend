@@ -1,36 +1,36 @@
 import type { UpdateAttendanceDTO } from '../validation/attendance.validation.js';
 export declare class AttendanceRepository {
     findAll(tenantFilter: any): Promise<({
+        employee: {
+            id: string;
+            role: string;
+            name: string;
+        };
         franchise: {
             id: string;
             name: string;
             city: string;
         } | null;
-        employee: {
-            id: string;
-            name: string;
-            role: string;
-        };
     } & {
         id: string;
         status: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     })[]>;
     findEmployeeById(id: string): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -42,8 +42,8 @@ export declare class AttendanceRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     } | null>;
@@ -53,16 +53,16 @@ export declare class AttendanceRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     } | null>;
     createCheckIn(employeeId: string, franchiseId: string | null, date: string, clockIn: string): Promise<{
         employee: {
             id: string;
-            name: string;
             role: string;
+            name: string;
         };
     } & {
         id: string;
@@ -70,16 +70,16 @@ export declare class AttendanceRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;
     updateCheckOut(id: string, clockOut: string): Promise<{
         employee: {
             id: string;
-            name: string;
             role: string;
+            name: string;
         };
     } & {
         id: string;
@@ -87,8 +87,8 @@ export declare class AttendanceRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;
@@ -98,8 +98,8 @@ export declare class AttendanceRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;

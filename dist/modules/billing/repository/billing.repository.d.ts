@@ -1,15 +1,15 @@
 import type { CreateInvoiceDTO } from '../validation/billing.validation.js';
 export declare class BillingRepository {
     findAll(): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -39,15 +39,15 @@ export declare class BillingRepository {
     }[]>;
     findMaxIdForPrefix(prefix: string): Promise<number>;
     create(id: string, data: CreateInvoiceDTO): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -63,15 +63,15 @@ export declare class BillingRepository {
         authorizedSignatory: string | null;
     }>;
     findById(id: string): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -87,15 +87,15 @@ export declare class BillingRepository {
         authorizedSignatory: string | null;
     } | null>;
     update(id: string, data: any): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;

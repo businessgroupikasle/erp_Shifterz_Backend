@@ -14,15 +14,15 @@ export declare class PaymentsRepository {
         ref: string;
     }[]>;
     findInvoiceById(id: string): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -64,15 +64,15 @@ export declare class PaymentsRepository {
         ref: string;
     }[]>;
     updateInvoiceStatus(id: string, status: string): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;

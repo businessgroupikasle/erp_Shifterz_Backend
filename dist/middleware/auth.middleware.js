@@ -1,9 +1,6 @@
 import jwt from "jsonwebtoken";
-const JWT_SECRET = process.env.JWT_SECRET || "";
-if (!JWT_SECRET) {
-    console.error("CRITICAL ERROR: JWT_SECRET is not defined in environment variables.");
-    process.exit(1);
-}
+import { env } from "../config/env.js";
+const JWT_SECRET = env.JWT_SECRET;
 export const authenticate = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -16,6 +13,7 @@ export const authenticate = (req, res, next) => {
             id: decoded.id,
             role: decoded.role,
             franchiseId: decoded.franchiseId || null,
+            permissions: decoded.permissions || [],
         };
         next();
     }
@@ -23,13 +21,27 @@ export const authenticate = (req, res, next) => {
         return res.status(401).json({ error: "Unauthorized: Token expired or invalid" });
     }
 };
-export const authorize = (roles) => {
+export const requireRole = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: "Unauthorized" });
         }
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+            return res.status(403).json({ error: "Forbidden: Insufficient role" });
+        }
+        next();
+    };
+};
+export const requirePermission = (permission) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        if (req.user.role === "SUPER_ADMIN") {
+            return next();
+        }
+        if (!req.user.permissions || !req.user.permissions.includes(permission)) {
+            return res.status(403).json({ error: `Forbidden: Missing permission ${permission}` });
         }
         next();
     };

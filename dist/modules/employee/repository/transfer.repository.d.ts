@@ -2,16 +2,16 @@ import type { CreateTransferDTO, UpdateTransferDTO } from '../validation/transfe
 export declare class TransferRepository {
     findAll(): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;
@@ -20,8 +20,8 @@ export declare class TransferRepository {
         requestedBy: string;
     }[]>;
     findEmployeeById(id: string): Promise<{
-        name: string;
         role: string;
+        name: string;
     } | null>;
     findFranchiseById(id: string): Promise<{
         name: string;
@@ -29,16 +29,16 @@ export declare class TransferRepository {
     } | null>;
     create(data: CreateTransferDTO, requester: string): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;
@@ -48,16 +48,16 @@ export declare class TransferRepository {
     }>;
     findRequestById(id: string): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;
@@ -67,16 +67,16 @@ export declare class TransferRepository {
     } | null>;
     updateRequestStatus(id: string, status: string): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;
@@ -86,16 +86,16 @@ export declare class TransferRepository {
     }>;
     updateRequest(id: string, data: UpdateTransferDTO): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;
@@ -105,13 +105,13 @@ export declare class TransferRepository {
     }>;
     createEmployeeFromTransfer(data: any): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -119,13 +119,13 @@ export declare class TransferRepository {
     }>;
     updateEmployeeFranchise(employeeId: string, franchiseId: string | null): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -133,16 +133,16 @@ export declare class TransferRepository {
     }>;
     softDelete(id: string): Promise<{
         id: string;
-        username: string | null;
-        status: string;
-        password: string | null;
         role: string | null;
+        status: string;
+        username: string | null;
+        password: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
         date: string;
+        createdAt: Date;
+        employeeId: string | null;
+        updatedAt: Date;
         toFranchiseId: string | null;
         newMemberName: string | null;
         newMemberPhone: string | null;

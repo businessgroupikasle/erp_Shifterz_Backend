@@ -2,9 +2,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authRepository } from "./auth.repository.js";
 import { resolveUserPermissions } from "../../lib/auth.js";
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET)
-    throw new Error("JWT_SECRET is not defined");
+import { env } from "../../config/env.js";
+const JWT_SECRET = env.JWT_SECRET;
 export class AuthService {
     async login(username, password) {
         const normalizedUsername = username.trim().toLowerCase();

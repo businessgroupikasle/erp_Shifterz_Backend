@@ -9,7 +9,6 @@ export declare class JobCardService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -21,6 +20,7 @@ export declare class JobCardService {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }[]>;
     createJob(data: CreateJobCardDTO): Promise<{
         id: string;
@@ -28,7 +28,6 @@ export declare class JobCardService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -40,6 +39,7 @@ export declare class JobCardService {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }>;
     updateJob(id: string, data: UpdateJobCardDTO): Promise<{
         id: string;
@@ -47,7 +47,6 @@ export declare class JobCardService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -59,6 +58,7 @@ export declare class JobCardService {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }>;
     deleteJob(id: string): Promise<{
         id: string;
@@ -66,7 +66,6 @@ export declare class JobCardService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -78,6 +77,7 @@ export declare class JobCardService {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }>;
 }
 //# sourceMappingURL=job-card.service.d.ts.map

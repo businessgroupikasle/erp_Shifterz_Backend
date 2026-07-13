@@ -5,15 +5,15 @@ export declare class BillingService {
     constructor(repository?: BillingRepository);
     getAllInvoices(): Promise<{
         paidAmount: number;
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -29,15 +29,15 @@ export declare class BillingService {
         authorizedSignatory: string | null;
     }[]>;
     createInvoice(data: CreateInvoiceDTO): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -53,15 +53,15 @@ export declare class BillingService {
         authorizedSignatory: string | null;
     }>;
     updateInvoice(id: string, data: UpdateInvoiceDTO): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;

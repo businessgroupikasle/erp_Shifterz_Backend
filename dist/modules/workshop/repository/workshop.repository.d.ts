@@ -5,8 +5,8 @@ export declare class WorkshopRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     } | null>;
@@ -16,7 +16,6 @@ export declare class WorkshopRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -28,6 +27,7 @@ export declare class WorkshopRepository {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }[]>;
 }
 //# sourceMappingURL=workshop.repository.d.ts.map

@@ -114,7 +114,6 @@ export declare class VehicleCheckinRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -126,6 +125,7 @@ export declare class VehicleCheckinRepository {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }>;
     updateJobCard(id: string, data: any): Promise<{
         id: string;
@@ -133,7 +133,6 @@ export declare class VehicleCheckinRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -145,6 +144,7 @@ export declare class VehicleCheckinRepository {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }>;
     findCustomerByPhone(phone: string): Promise<{
         id: string;

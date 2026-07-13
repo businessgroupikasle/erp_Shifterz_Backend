@@ -20,13 +20,13 @@ export declare class AuthService {
     }>;
     updateProfile(userId: string, data: any): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;

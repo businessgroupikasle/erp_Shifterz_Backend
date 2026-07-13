@@ -4,32 +4,32 @@ export declare class AttendanceService {
     private readonly repository;
     constructor(repository?: AttendanceRepository);
     getAllAttendance(userRole: string, userId: string, userFranchiseId?: string): Promise<({
+        employee: {
+            id: string;
+            role: string;
+            name: string;
+        };
         franchise: {
             id: string;
             name: string;
             city: string;
         } | null;
-        employee: {
-            id: string;
-            name: string;
-            role: string;
-        };
     } & {
         id: string;
         status: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     })[]>;
     checkIn(data: CheckInDTO): Promise<{
         employee: {
             id: string;
-            name: string;
             role: string;
+            name: string;
         };
     } & {
         id: string;
@@ -37,16 +37,16 @@ export declare class AttendanceService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;
     checkOut(data: CheckOutDTO): Promise<{
         employee: {
             id: string;
-            name: string;
             role: string;
+            name: string;
         };
     } & {
         id: string;
@@ -54,8 +54,8 @@ export declare class AttendanceService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;
@@ -65,8 +65,8 @@ export declare class AttendanceService {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        employeeId: string;
         date: string;
+        employeeId: string;
         clockIn: string | null;
         clockOut: string | null;
     }>;

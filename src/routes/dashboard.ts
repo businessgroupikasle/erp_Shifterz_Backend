@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../lib/db.js";
-import { requireAuth, tenantScope } from "../lib/auth.js";
+import { authenticate as requireAuth, tenant as tenantScope } from "../middleware/auth.middleware.js";
 
 export const dashboardRouter = Router();
 

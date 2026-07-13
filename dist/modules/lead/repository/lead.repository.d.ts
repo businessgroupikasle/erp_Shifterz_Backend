@@ -3,8 +3,8 @@ export declare class LeadRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
@@ -20,8 +20,8 @@ export declare class LeadRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
@@ -37,8 +37,8 @@ export declare class LeadRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
@@ -54,8 +54,8 @@ export declare class LeadRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
@@ -71,8 +71,8 @@ export declare class LeadRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;

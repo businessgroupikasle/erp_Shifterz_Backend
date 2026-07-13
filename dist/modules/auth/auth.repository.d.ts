@@ -2,20 +2,20 @@ export declare class AuthRepository {
     findEmployeeByUsername(username: string): Promise<({
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
     } & {
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -24,20 +24,20 @@ export declare class AuthRepository {
     findEmployeeById(id: string): Promise<({
         permission: {
             id: string;
+            createdAt: Date;
             employeeId: string;
             modules: string[];
-            createdAt: Date;
             updatedAt: Date;
         } | null;
     } & {
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;
@@ -45,13 +45,13 @@ export declare class AuthRepository {
     }) | null>;
     updateEmployee(id: string, data: any): Promise<{
         id: string;
-        username: string | null;
+        role: string;
         name: string;
         phone: string | null;
-        email: string | null;
         status: string;
+        email: string | null;
+        username: string | null;
         password: string | null;
-        role: string;
         hqControlled: boolean;
         franchiseId: string | null;
         isDeleted: boolean;

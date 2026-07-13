@@ -1,14 +1,14 @@
 export declare class ReportRepository {
     getInvoices(): Promise<{
+        type: string;
         id: string;
         phone: string;
         status: string;
+        gstNumber: string | null;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        gstNumber: string | null;
         service: string;
-        type: string;
         client: string;
         vehicle: string;
         amount: number;
@@ -40,8 +40,8 @@ export declare class ReportRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
@@ -59,7 +59,6 @@ export declare class ReportRepository {
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
-        createdAt: Date;
         service: string;
         customer: string;
         vehicle: string;
@@ -71,6 +70,7 @@ export declare class ReportRepository {
         actualCompletion: string | null;
         photos: string[];
         technicianId: string | null;
+        createdAt: Date;
     }[]>;
     getInventory(): Promise<{
         id: string;
@@ -89,23 +89,23 @@ export declare class ReportRepository {
     getFranchises(): Promise<{
         id: string;
         name: string;
-        phone: string;
-        email: string | null;
-        status: string;
-        isDeleted: boolean;
-        deletedAt: string | null;
-        jobs: number;
         city: string;
         owner: string;
+        phone: string;
         since: string;
         royaltyPct: number;
+        status: string;
         businessName: string | null;
         gstNumber: string | null;
+        email: string | null;
         address: string | null;
         state: string | null;
         pinCode: string | null;
         licenseStatus: string | null;
+        isDeleted: boolean;
+        deletedAt: string | null;
         revenue: number;
+        jobs: number;
     }[]>;
 }
 //# sourceMappingURL=report.repository.d.ts.map

@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 
 import { hqRouter } from "./routes/hq.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { logger } from "./shared/logger/logger.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,15 +79,15 @@ import { exec } from "child_process";
 
 // Start Server
 app.listen(PORT, async () => {
-  console.log(`Shifterz backend running on port ${PORT}`);
+  logger.info(`Shifterz backend running on port ${PORT}`);
 
   // Automigrate & regenerate Prisma client on startup
-  console.log("[Auto-Migration] Running npx prisma db push...");
+  logger.info("[Auto-Migration] Running npx prisma db push...");
   exec("npx prisma db push", (err, stdout, stderr) => {
     if (err) {
-      console.error("[Auto-Migration] Failed to migrate database:", err);
+      logger.error(`[Auto-Migration] Failed to migrate database: ${err.message}`);
     } else {
-      console.log("[Auto-Migration] Database migrated and generated successfully:", stdout);
+      logger.info(`[Auto-Migration] Database migrated and generated successfully: ${stdout}`);
     }
   });
 });

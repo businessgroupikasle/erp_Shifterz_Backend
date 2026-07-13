@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authController } from "./auth.controller.js";
-import { authenticate, authorize } from "../../middleware/auth.middleware.js";
+import { authenticate, requireRole } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { loginSchema, updateProfileSchema, updateRolePermissionsSchema } from "./auth.validation.js";
 
@@ -13,8 +13,8 @@ router.post("/login", validate(loginSchema), authController.login);
 router.get("/me", authenticate, authController.getMe);
 router.put("/profile", authenticate, validate(updateProfileSchema), authController.updateProfile);
 
-// Admin routes (Example RBAC usage)
-router.get("/roles/permissions", authenticate, authorize(["SUPER_ADMIN", "HQ_USER"]), authController.getRolePermissions);
-router.put("/roles/permissions/:role", authenticate, authorize(["SUPER_ADMIN", "HQ_USER"]), validate(updateRolePermissionsSchema), authController.updateRolePermissions);
+// Admin routes (Example RBAC usage)// RBAC
+router.get("/roles/permissions", authenticate, requireRole("SUPER_ADMIN", "HQ_USER"), authController.getRolePermissions);
+router.put("/roles/permissions/:role", authenticate, requireRole("SUPER_ADMIN", "HQ_USER"), validate(updateRolePermissionsSchema), authController.updateRolePermissions);
 
 export const authRoutes = router;

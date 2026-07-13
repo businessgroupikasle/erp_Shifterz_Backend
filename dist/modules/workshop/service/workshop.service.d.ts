@@ -9,8 +9,8 @@ export declare class WorkshopService {
             franchiseId: string | null;
             isDeleted: boolean;
             deletedAt: string | null;
-            employeeId: string;
             date: string;
+            employeeId: string;
             clockIn: string | null;
             clockOut: string | null;
         } | {

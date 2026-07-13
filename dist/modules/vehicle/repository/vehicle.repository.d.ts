@@ -35,8 +35,8 @@ export declare class VehicleRepository {
         id: string;
         name: string;
         phone: string;
-        email: string;
         status: string;
+        email: string;
         franchiseId: string | null;
         isDeleted: boolean;
         deletedAt: string | null;
