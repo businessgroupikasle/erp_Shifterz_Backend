@@ -120,11 +120,11 @@ async function main() {
   // Franchise
   await prisma.franchise.createMany({
     data: [
-      { id: "F001", name: "Shifterz Chennai", city: "Chennai", owner: "Balaji S", phone: "98400 11111", since: "2024-01-15", revenue: 380000, jobs: 48, royaltyPct: 5, status: "Active" },
-      { id: "F002", name: "Shifterz Bangalore", city: "Bangalore", owner: "Ravi Kumar", phone: "98400 22222", since: "2024-04-10", revenue: 520000, jobs: 65, royaltyPct: 5, status: "Active" },
-      { id: "F003", name: "Shifterz Hyderabad", city: "Hyderabad", owner: "Anand P", phone: "98400 33333", since: "2024-07-20", revenue: 290000, jobs: 38, royaltyPct: 5, status: "Active" },
-      { id: "F004", name: "Shifterz Pune", city: "Pune", owner: "Suresh M", phone: "98400 44444", since: "2024-11-01", revenue: 140000, jobs: 22, royaltyPct: 5, status: "Trial" },
-      { id: "F005", name: "Shifterz Kochi", city: "Kochi", owner: "Jithin K", phone: "98400 55555", since: "2025-02-14", revenue: 95000, jobs: 15, royaltyPct: 5, status: "Trial" },
+      { id: "F001", name: "Shifterz Chennai", city: "Chennai", owner: "Balaji S", phone: "98400 11111", since: new Date("2024-01-15"), revenue: 380000, jobs: 48, royaltyPct: 5, status: "Active" },
+      { id: "F002", name: "Shifterz Bangalore", city: "Bangalore", owner: "Ravi Kumar", phone: "98400 22222", since: new Date("2024-04-10"), revenue: 520000, jobs: 65, royaltyPct: 5, status: "Active" },
+      { id: "F003", name: "Shifterz Hyderabad", city: "Hyderabad", owner: "Anand P", phone: "98400 33333", since: new Date("2024-07-20"), revenue: 290000, jobs: 38, royaltyPct: 5, status: "Active" },
+      { id: "F004", name: "Shifterz Pune", city: "Pune", owner: "Suresh M", phone: "98400 44444", since: new Date("2024-11-01"), revenue: 140000, jobs: 22, royaltyPct: 5, status: "Trial" },
+      { id: "F005", name: "Shifterz Kochi", city: "Kochi", owner: "Jithin K", phone: "98400 55555", since: new Date("2025-02-14"), revenue: 95000, jobs: 15, royaltyPct: 5, status: "Trial" },
     ],
   });
 

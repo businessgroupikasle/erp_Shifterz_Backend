@@ -1,9 +1,9 @@
-datasource db {
-  provider = "postgresql"
-}
-
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
 }
 
 model Lead {
@@ -18,11 +18,11 @@ model Lead {
   status      String
   notes       String
   budget      String
-  date DateTime
+  date        DateTime
   franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt   DateTime?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Invoice {
@@ -36,8 +36,8 @@ model Invoice {
   gst                 Float
   discount            Float
   status              String
-  date DateTime
-  dueDate DateTime
+  date                DateTime
+  dueDate             DateTime
   notes               String
   gstNumber           String?
   items               Json?
@@ -46,15 +46,15 @@ model Invoice {
   deliveryTerms       String?
   authorizedSignatory String?
   franchiseId         String?
-  franchise           Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted           Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt           DateTime?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @default(now()) @updatedAt
   createdBy           String?
   modifiedBy          String?
   cancelledBy         String?
   approvedBy          String?
+  franchise           Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Payment {
@@ -63,16 +63,16 @@ model Payment {
   client      String
   amount      Float
   mode        String
-  date DateTime
+  date        DateTime
   ref         String
   notes       String
   franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @default(now()) @updatedAt
   createdBy   String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Inventory {
@@ -86,20 +86,20 @@ model Inventory {
   supplier    String
   location    String
   franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt   DateTime?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Service {
-  id       String @id
-  name     String
-  category String
-  price    Float
-  duration String
-  warranty String
-  desc     String
-  isDeleted   Boolean    @default(false)
+  id        String    @id
+  name      String
+  category  String
+  price     Float
+  duration  String
+  warranty  String
+  desc      String
+  isDeleted Boolean   @default(false)
   deletedAt DateTime?
 }
 
@@ -109,7 +109,7 @@ model Franchise {
   city              String
   owner             String
   phone             String
-  since DateTime
+  since             DateTime
   revenue           Float
   jobs              Int
   royaltyPct        Float
@@ -120,21 +120,21 @@ model Franchise {
   address           String?
   state             String?
   pinCode           String?
-  licenseStatus     String? @default("Active")
-  leads             Lead[]
-  invoices          Invoice[]
-  payments          Payment[]
-  inventory         Inventory[]
-  customers         Customer[]
-  carIns            CarIn[]
-  jobsList          Job[]
-  outPasses         OutPass[]
-  employees         Employee[]
-  attendances       Attendance[]
-  inventoryRequests InventoryRequest[]
+  licenseStatus     String?            @default("Active")
+  isDeleted         Boolean            @default(false)
+  deletedAt         DateTime?
   appointments      Appointment[]
-  isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  attendances       Attendance[]
+  carIns            CarIn[]
+  customers         Customer[]
+  employees         Employee[]
+  inventory         Inventory[]
+  inventoryRequests InventoryRequest[]
+  invoices          Invoice[]
+  jobsList          Job[]
+  leads             Lead[]
+  outPasses         OutPass[]
+  payments          Payment[]
 }
 
 model Customer {
@@ -146,11 +146,11 @@ model Customer {
   model       String
   visits      Int
   totalSpend  Float
-  lastVisit DateTime
+  lastVisit   DateTime
   franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt   DateTime?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model CarIn {
@@ -161,16 +161,16 @@ model CarIn {
   phone        String
   service      String
   technicianIn String
-  inTime DateTime
-  outTime DateTime?
+  inTime       DateTime
+  outTime      DateTime?
   status       String
   odometer     String
   notes        String
   jobCardId    String
   franchiseId  String?
-  franchise    Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted    Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt    DateTime?
+  franchise    Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model Job {
@@ -181,17 +181,17 @@ model Job {
   technician       String
   status           String
   priority         String
-  startDate DateTime
-  estCompletion DateTime
+  startDate        DateTime
+  estCompletion    DateTime
   actualCompletion DateTime?
   notes            String
   photos           String[]
   technicianId     String?
   franchiseId      String?
   createdAt        DateTime   @default(now())
-  franchise        Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted        Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt        DateTime?
+  franchise        Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model OutPass {
@@ -201,20 +201,20 @@ model OutPass {
   customer       String
   phone          String
   service        String
-  outTime DateTime
+  outTime        DateTime
   securityName   String
   technicianName String
   remarks        String
   issued         Boolean
   carInId        String
   franchiseId    String?
+  isDeleted      Boolean    @default(false)
+  deletedAt      DateTime?
   franchise      Franchise? @relation(fields: [franchiseId], references: [id])
-  isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
 }
 
 model Setting {
-  id             String   @id @default("default")
+  id             String    @id @default("default")
   companyName    String
   address        String
   phone          String
@@ -225,8 +225,8 @@ model Setting {
   agents         String[]
   categories     String[]
   securityGuards String[]
-  isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
 }
 
 model Employee {
@@ -237,40 +237,40 @@ model Employee {
   status       String          @default("Active")
   username     String?         @unique
   password     String?
-  role         String          @default("TECHNICIAN") // SUPER_ADMIN, HQ_USER, FRANCHISE_ADMIN, RECEPTIONIST, SERVICE_ADVISOR, TECHNICIAN, BILLING
-  permission   UserPermission?
+  role         String          @default("TECHNICIAN")
   hqControlled Boolean         @default(false)
   franchiseId  String?
-  franchise    Franchise?      @relation(fields: [franchiseId], references: [id])
-  attendances  Attendance[]
   isDeleted    Boolean         @default(false)
-  deletedAt DateTime?
+  deletedAt    DateTime?
+  attendances  Attendance[]
+  franchise    Franchise?      @relation(fields: [franchiseId], references: [id])
+  permission   UserPermission?
 }
 
 model Attendance {
   id          String     @id @default(cuid())
   employeeId  String
-  employee    Employee   @relation(fields: [employeeId], references: [id])
-  date DateTime
-  status      String // Present, Absent, Leave
-  clockIn DateTime?
-  clockOut DateTime?
+  date        DateTime
+  status      String
+  clockIn     DateTime?
+  clockOut    DateTime?
   franchiseId String?
-  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
   isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
+  deletedAt   DateTime?
+  employee    Employee   @relation(fields: [employeeId], references: [id])
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id])
 }
 
 model InventoryRequest {
   id                String     @id @default(cuid())
   itemId            String
   quantityRequested Int
-  status            String // Pending, Approved, Rejected
-  date DateTime
+  status            String
+  date              DateTime
   franchiseId       String?
+  isDeleted         Boolean    @default(false)
+  deletedAt         DateTime?
   franchise         Franchise? @relation(fields: [franchiseId], references: [id])
-  isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
 }
 
 model Appointment {
@@ -280,20 +280,20 @@ model Appointment {
   vehicle       String
   scheduledDate DateTime
   service       String
-  status        String // Scheduled, Arrived, Cancelled
+  status        String
   franchiseId   String?
+  isDeleted     Boolean    @default(false)
+  deletedAt     DateTime?
   franchise     Franchise? @relation(fields: [franchiseId], references: [id])
-  isDeleted   Boolean    @default(false)
-  deletedAt DateTime?
 }
 
 model UserPermission {
-  id          String   @id @default(cuid())
-  employeeId  String   @unique
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  modules     String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  employeeId String   @unique
+  modules    String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model RolePermission {
@@ -301,14 +301,13 @@ model RolePermission {
   permissions String[]
 }
 
-
 model MemberTransferRequest {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   employeeId      String?
   fromFranchiseId String?
   toFranchiseId   String?
   requestedBy     String
-  date DateTime
+  date            DateTime
   status          String
   username        String?
   password        String?
@@ -316,8 +315,8 @@ model MemberTransferRequest {
   newMemberPhone  String?
   newMemberEmail  String?
   role            String?
-  isDeleted       Boolean  @default(false)
-  deletedAt DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
